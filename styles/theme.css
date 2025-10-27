@@ -2,19 +2,38 @@
 
 :root {
   /* === Color Palette === */
-  /* Primary Colors */
-  --color-primary: #FF6B35;
-  --color-primary-light: #FF8A5E;
-  --color-primary-dark: #E65420;
+  /* Primary Colors - Fresh Pistachio Green Theme */
+  --color-primary: #97c28a;
+  --color-primary-light: #F5FAF3;
+  --color-primary-dark: #8FC280;
 
-  /* Secondary Colors */
-  --color-secondary: #E07A5F;
-  --color-secondary-light: #E89986;
-  --color-secondary-dark: #C96449;
+  /* Secondary Colors - Complementary Green Tones */
+  --color-secondary: #5eac42;
+  --color-secondary-light: #B8D9AA;
+  --color-secondary-dark: #7FB76D;
 
-  /* Accent Colors */
-  --color-accent: #F4F1DE;
-  --color-accent-dark: #E5E0C8;
+  /* Accent Colors - Soft Mint */
+  --color-accent: #E8F5E3;
+  --color-accent-dark: #D4ECC8;
+
+  /* Glassmorphism Variables */
+  --glass-bg: rgba(255, 255, 255, 0.35);
+  --glass-bg-hover: rgba(255, 255, 255, 0.45);
+  --glass-border: rgba(255, 255, 255, 0.25);
+  --glass-shadow: rgba(171, 211, 159, 0.1);
+  --glass-blur: 20px;
+  --glass-blur-heavy: 40px;
+
+  /* Gradient Orb Colors for Background */
+  --orb-pistachio: #ABD39F;
+  --orb-sage: #9DC88D;
+  --orb-mint: #B8E8A8;
+  --orb-leaf: #8FC280;
+
+  /* Background Gradient Colors */
+  --color-background-gradient-start: #E8F5E3;
+  --color-background-gradient-middle: #F5FBF2;
+  --color-background-gradient-end: #D4ECC8;
 
   /* Success/Fresh */
   --color-success: #81B622;
@@ -104,6 +123,37 @@
 
   /* === Touch Targets === */
   --touch-target-min: 48px; /* Minimum tap target size */
+}
+
+/* Orange Theme */
+[data-theme="orange"] {
+  /* Primary Colors - Warm Orange Theme */
+  --color-primary: #FA8502;
+  --color-primary-light: #FFF8F3;
+  --color-primary-dark: #E67700;
+
+  /* Secondary Colors - Complementary Orange Tones */
+  --color-secondary: #FF8C42;
+  --color-secondary-light: #FFA666;
+  --color-secondary-dark: #E67528;
+
+  /* Accent Colors - Soft Peach */
+  --color-accent: #FFE8D6;
+  --color-accent-dark: #FFD4B8;
+
+  /* Glassmorphism Variables */
+  --glass-shadow: rgba(250, 133, 2, 0.1);
+
+  /* Gradient Orb Colors for Background */
+  --orb-pistachio: #FF8C42;
+  --orb-sage: #FA8502;
+  --orb-mint: #FF6B6B;
+  --orb-leaf: #FFB380;
+
+  /* Background Gradient Colors */
+  --color-background-gradient-start: #FFE8D6;
+  --color-background-gradient-middle: #FFF5ED;
+  --color-background-gradient-end: #FFD4B8;
 }
 
 /* Dark Mode */

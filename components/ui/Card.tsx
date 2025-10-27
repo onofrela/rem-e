@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'elevated' | 'outlined';
+  variant?: 'default' | 'elevated' | 'outlined' | 'glass';
   padding?: 'none' | 'sm' | 'md' | 'lg';
   hoverable?: boolean;
 }
@@ -19,14 +19,29 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
     ref
   ) => {
     const baseStyles = `
-      rounded-xl
-      transition-all duration-200
+      rounded-2xl
+      transition-all duration-300
     `;
 
     const variantStyles = {
-      default: 'bg-[var(--color-surface)] border border-[var(--color-border)]',
-      elevated: 'bg-[var(--color-surface-elevated)] shadow-md',
-      outlined: 'bg-transparent border-2 border-[var(--color-border)]',
+      default: 'bg-[var(--color-primary-light)] border border-[var(--color-border)]',
+      elevated: `
+        bg-[var(--color-primary-light)]
+        backdrop-blur-[var(--glass-blur)]
+        border border-[var(--glass-border)]
+        shadow-[0_8px_32px_var(--glass-shadow)]
+      `,
+      outlined: `
+        bg-[var(--color-primary-light)]
+        backdrop-blur-[var(--glass-blur)]
+        border-2 border-[var(--glass-border)]
+      `,
+      glass: `
+        bg-[var(--color-primary-light)]
+        backdrop-blur-[var(--glass-blur)]
+        border border-[var(--glass-border)]
+        shadow-[0_8px_32px_var(--glass-shadow)]
+      `,
     };
 
     const paddingStyles = {
@@ -37,7 +52,11 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
     };
 
     const hoverStyles = hoverable
-      ? 'hover:shadow-lg hover:scale-[1.02] cursor-pointer'
+      ? `hover:bg-[var(--glass-bg-hover)]
+         hover:shadow-[0_12px_40px_var(--glass-shadow)]
+         hover:scale-[1.02]
+         hover:border-white/40
+         cursor-pointer`
       : '';
 
     return (

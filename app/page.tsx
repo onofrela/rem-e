@@ -21,171 +21,166 @@ export default function Home() {
 
   return (
     <MainLayout>
-      <div className="min-h-screen pb-20 md:pb-8">
-        {/* Header Section */}
-        <div className="pt-8 pb-12 px-4 md:px-6">
-          <div className="container mx-auto max-w-4xl">
-            <div className="flex items-center justify-between mb-2 animate-fadeInDown">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[var(--color-primary)]">
-                Rem-E
-              </h1>
-              <Link href="/settings">
-                <button className="text-2xl p-2 hover:bg-[var(--color-surface)] rounded-full transition-colors">
-                  ⚙️
-                </button>
-              </Link>
-            </div>
-            <p className="text-lg md:text-xl text-[var(--color-text-secondary)]">
-              {greeting}
-            </p>
-            <h2 className="text-2xl md:text-3xl font-semibold mt-2 text-[var(--color-text-primary)]">
-              ¿Qué cocinaremos hoy?
-            </h2>
-          </div>
+      {/* Contenedor principal que ocupa toda la altura disponible */}
+      <div className="flex-1 flex flex-col min-h-0"> {/* clave: min-h-0 */}
+        
+        {/* Compact greeting header - only on tablet+ */}
+        <div className="hidden md:block px-6 py-6 flex-shrink-0"> {/* flex-shrink-0 para que no se encoja */}
+          <p className="text-lg md:text-xl text-gray-600">{greeting}</p>
+          <h2 className="text-2xl md:text-3xl font-semibold text-gray-800">¿Qué cocinaremos hoy?</h2>
         </div>
 
-        <div className="container mx-auto max-w-4xl px-4 md:px-6 -mt-6">
-          {/* Primary Action - Cook Now */}
-          <Link href="/cook">
-            <Card
-              variant="elevated"
-              padding="lg"
-              hoverable
-              className="mb-6 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] border-none animate-scaleIn"
-            >
-              <div className="flex items-center justify-between text-white">
-                <div>
-                  <p className="text-sm opacity-90 mb-1">Acción rápida</p>
-                  <h3 className="text-xl sm:text-2xl font-bold">🍽 Cocinar Ahora</h3>
-                  <p className="text-sm opacity-90 mt-1">
-                    Descubre recetas con lo que tienes
-                  </p>
-                </div>
-                <div className="text-3xl sm:text-4xl">→</div>
-              </div>
-            </Card>
-          </Link>
+        {/* Grid Container */}
+        <div className="flex-1 p-4 md:p-6 lg:p-8 min-h-0 overflow-auto"> {/* clave: flex-1 y min-h-0 */}
+          {/* Mobile: 2-column vertical | Tablet: 4-column horizontal grid with variable sizes */}
+          <div className="grid grid-cols-2 md:grid-cols-4 auto-rows-[minmax(140px,auto)] md:auto-rows-[minmax(240px,1fr)] gap-3 md:gap-5 lg:gap-6 w-full h-full"> 
 
-          {/* Secondary Actions Grid */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
-            <Link href="/inventory">
-              <Card variant="elevated" padding="md" hoverable className="h-full animate-fadeInUp stagger-1">
-                <div className="flex flex-col items-center text-center gap-2">
-                  <span className="text-3xl sm:text-4xl">🥫</span>
-                  <h3 className="text-sm sm:text-base font-semibold text-[var(--color-text-primary)]">
-                    Inventario
-                  </h3>
-                  <p className="text-xs sm:text-sm text-[var(--color-text-secondary)]">
-                    Tus ingredientes
-                  </p>
+            {/* Cook Now - 2x2 tile (Hero) */}
+            <Link href="/cook" className="col-span-2 row-span-2">
+              <Card
+                variant="elevated"
+                padding="lg"
+                hoverable
+                className="h-full animate-scaleIn flex flex-col justify-center relative overflow-hidden"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
+                <div className="relative flex flex-row md:flex-row items-center md:justify-between text-white h-full md:px-4">
+                  <div className="text-left md:text-left flex-1">
+                    <p className="text-sm md:text-xl lg:text-2xl opacity-95 mb-3 md:mb-4 font-medium">Acción rápida</p>
+                    <h3 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-3 md:mb-4 flex items-center gap-3 md:gap-4 drop-shadow-lg">
+                      <span className="text-5xl md:text-7xl lg:text-8xl">🍽</span>
+                      <span>Cocinar Ahora</span>
+                    </h3>
+                    <p className="text-sm md:text-xl lg:text-2xl opacity-95 font-medium">
+                      Descubre recetas con lo que tienes
+                    </p>
+                  </div>
+                  <div className="text-4xl md:text-7xl lg:text-8xl mt-4 md:mt-0 md:ml-4 opacity-90">→</div>
                 </div>
               </Card>
             </Link>
 
-            <Link href="/recipes">
-              <Card variant="elevated" padding="md" hoverable className="h-full animate-fadeInUp stagger-2">
-                <div className="flex flex-col items-center text-center gap-2">
-                  <span className="text-3xl sm:text-4xl">📖</span>
-                  <h3 className="text-sm sm:text-base font-semibold text-[var(--color-text-primary)]">
-                    Mis Recetas
-                  </h3>
-                  <p className="text-xs sm:text-sm text-[var(--color-text-secondary)]">
-                    Tus favoritas
-                  </p>
-                </div>
-              </Card>
-            </Link>
-
-            <Link href="/plan">
-              <Card variant="elevated" padding="md" hoverable className="h-full animate-fadeInUp stagger-3">
-                <div className="flex flex-col items-center text-center gap-2">
-                  <span className="text-3xl sm:text-4xl">📅</span>
-                  <h3 className="text-sm sm:text-base font-semibold text-[var(--color-text-primary)]">
-                    Planificar
-                  </h3>
-                  <p className="text-xs sm:text-sm text-[var(--color-text-secondary)]">
-                    Organiza tu semana
-                  </p>
-                </div>
-              </Card>
-            </Link>
-
-            <Link href="/learn">
-              <Card variant="elevated" padding="md" hoverable className="h-full animate-fadeInUp stagger-4">
-                <div className="flex flex-col items-center text-center gap-2">
-                  <span className="text-3xl sm:text-4xl">🎓</span>
-                  <h3 className="text-sm sm:text-base font-semibold text-[var(--color-text-primary)]">
-                    Aprender
-                  </h3>
-                  <p className="text-xs sm:text-sm text-[var(--color-text-secondary)]">
-                    Mejora tus habilidades
-                  </p>
-                </div>
-              </Card>
-            </Link>
-          </div>
-
-          {/* Suggestion of the Day */}
-          <div className="mb-8 animate-fadeInUp stagger-5">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-xl sm:text-2xl">💡</span>
-              <h3 className="text-lg sm:text-xl font-semibold text-[var(--color-text-primary)]">
-                Sugerencia del día
-              </h3>
-            </div>
-
-            <Link href={`/recipes/${suggestionOfTheDay.id}`}>
-              <Card variant="elevated" padding="none" hoverable>
-                {/* Recipe Image Placeholder */}
-                <div className="h-40 sm:h-48 bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-secondary)] rounded-t-xl flex items-center justify-center text-white text-5xl sm:text-6xl">
-                  🍽
-                </div>
-
-                <div className="p-4 sm:p-6">
-                  <h4 className="text-lg sm:text-xl font-bold text-[var(--color-text-primary)] mb-2">
-                    {suggestionOfTheDay.name}
-                  </h4>
-                  <p className="text-sm sm:text-base text-[var(--color-text-secondary)] mb-4">
-                    {suggestionOfTheDay.description}
-                  </p>
-
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Badge variant="default">
-                      ⏱ {suggestionOfTheDay.time} min
-                    </Badge>
-                    <Badge variant="success">
-                      👨‍🍳 {suggestionOfTheDay.difficulty}
-                    </Badge>
-                    <Badge variant="info">
-                      🍴 {suggestionOfTheDay.servings} porciones
-                    </Badge>
+            {/* Suggestion of the Day - 2x1 tile */}
+            <Link href={`/recipes/${suggestionOfTheDay.id}`} className="col-span-2 row-span-1">
+              <Card variant="elevated" padding="none" hoverable className="h-full animate-fadeInUp stagger-5 overflow-hidden flex flex-row">
+                {/* Recipe Info */}
+                <div className="p-4 md:p-6 flex flex-col justify-between flex-1">
+                  <div>
+                    <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                      <span className="text-2xl md:text-3xl lg:text-4xl">💡</span>
+                      <span className="text-sm md:text-base lg:text-lg font-semibold text-gray-600">
+                        Sugerencia del día
+                      </span>
+                    </div>
+                    <h4 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-800 mb-2 md:mb-3">
+                      {suggestionOfTheDay.name}
+                    </h4>
+                    <p className="text-sm md:text-base lg:text-lg text-gray-600 mb-3 md:mb-4 line-clamp-2">
+                      {suggestionOfTheDay.description}
+                    </p>
                   </div>
 
-                  <Button variant="primary" fullWidth>
-                    Ver Receta
-                  </Button>
+                  <div className="flex flex-wrap gap-2 md:gap-3">
+                    <Badge variant="default" className="text-xs md:text-sm lg:text-base">
+                      ⏱ {suggestionOfTheDay.time}m
+                    </Badge>
+                    <Badge variant="success" className="text-xs md:text-sm lg:text-base">
+                      👨‍🍳 {suggestionOfTheDay.difficulty}
+                    </Badge>
+                    <Badge variant="info" className="text-xs md:text-sm lg:text-base">
+                      🍴 {suggestionOfTheDay.servings}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Recipe Image */}
+                <div className="w-32 md:w-48 lg:w-56 flex items-center justify-center text-white text-5xl md:text-7xl lg:text-8xl flex-shrink-0 border-l border-white/20" style={{ backgroundColor: 'var(--color-primary)' }}>
+                  🍽
                 </div>
               </Card>
             </Link>
-          </div>
 
-          {/* Quick Stats/Tips */}
-          <Card variant="outlined" padding="md" className="bg-[var(--color-accent)] animate-fadeIn">
-            <div className="flex items-start gap-3">
-              <span className="text-xl sm:text-2xl">💭</span>
-              <div>
-                <h4 className="text-sm sm:text-base font-semibold text-[var(--color-text-primary)] mb-1">
-                  Consejo de hoy
-                </h4>
-                <p className="text-xs sm:text-sm text-[var(--color-text-secondary)]">
-                  El ajo y la cebolla son la base de muchos platillos. Siempre
-                  ten algunos a la mano para dar sabor a tus comidas.
-                </p>
-              </div>
+            {/* Tip of the Day - 2x1 wide tile */}
+            <div className="col-span-2 row-span-1">
+              <Card variant="outlined" padding="lg" className="h-full animate-fadeIn flex items-center">
+                <div className="flex items-center gap-4 md:gap-6 w-full">
+                  <span className="text-4xl md:text-5xl lg:text-6xl flex-shrink-0">💭</span>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm md:text-lg lg:text-xl font-semibold text-gray-800 mb-2 md:mb-3">
+                      Consejo de hoy
+                    </h4>
+                    <p className="text-sm md:text-base lg:text-lg text-gray-600 line-clamp-2">
+                      El ajo y la cebolla son la base de muchos platillos. Siempre
+                      ten algunos a la mano para dar sabor a tus comidas.
+                    </p>
+                  </div>
+                </div>
+              </Card>
             </div>
-          </Card>
+            
+            {/* Inventory - 1x1 tile */}
+            <Link href="/inventory" className="col-span-1 row-span-1">
+              <Card variant="elevated" padding="lg" hoverable className="h-full animate-fadeInUp stagger-1 flex flex-col justify-center items-center text-center gap-2 md:gap-3">
+                <span className="text-5xl md:text-6xl lg:text-7xl">🥫</span>
+                <div>
+                  <h3 className="text-base md:text-xl lg:text-2xl font-semibold text-gray-800">
+                    Inventario
+                  </h3>
+                  <p className="text-sm md:text-base lg:text-lg text-gray-600 mt-1 md:mt-2">
+                    Ingredientes
+                  </p>
+                </div>
+              </Card>
+            </Link>
+
+            {/* My Recipes - 1x1 tile */}
+            <Link href="/recipes" className="col-span-1 row-span-1">
+              <Card variant="elevated" padding="lg" hoverable className="h-full animate-fadeInUp stagger-2 flex flex-col justify-center items-center text-center gap-2 md:gap-3">
+                <span className="text-5xl md:text-6xl lg:text-7xl">📖</span>
+                <div>
+                  <h3 className="text-base md:text-xl lg:text-2xl font-semibold text-gray-800">
+                    Mis Recetas
+                  </h3>
+                  <p className="text-sm md:text-base lg:text-lg text-gray-600 mt-1 md:mt-2">
+                    Favoritas
+                  </p>
+                </div>
+              </Card>
+            </Link>
+
+            {/* Plan - 1x1 tile */}
+            <Link href="/plan" className="col-span-1 row-span-1">
+              <Card variant="elevated" padding="lg" hoverable className="h-full animate-fadeInUp stagger-3 flex flex-col justify-center items-center text-center gap-2 md:gap-3">
+                <span className="text-5xl md:text-6xl lg:text-7xl">📅</span>
+                <div>
+                  <h3 className="text-base md:text-xl lg:text-2xl font-semibold text-gray-800">
+                    Planificar
+                  </h3>
+                  <p className="text-sm md:text-base lg:text-lg text-gray-600 mt-1 md:mt-2">
+                    Tu semana
+                  </p>
+                </div>
+              </Card>
+            </Link>
+
+            {/* Learn - 1x1 tile */}
+            <Link href="/learn" className="col-span-1 row-span-1">
+              <Card variant="elevated" padding="lg" hoverable className="h-full animate-fadeInUp stagger-4 flex flex-col justify-center items-center text-center gap-2 md:gap-3">
+                <span className="text-5xl md:text-6xl lg:text-7xl">🎓</span>
+                <div>
+                  <h3 className="text-base md:text-xl lg:text-2xl font-semibold text-gray-800">
+                    Aprender
+                  </h3>
+                  <p className="text-sm md:text-base lg:text-lg text-gray-600 mt-1 md:mt-2">
+                    Habilidades
+                  </p>
+                </div>
+              </Card>
+            </Link>
+
+          </div>
+          </div>
         </div>
-      </div>
     </MainLayout>
   );
 }

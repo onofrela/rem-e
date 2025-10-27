@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface NavItem {
   id: string;
@@ -48,16 +49,16 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      {/* Header Bar with Hamburger Button and Logo */}
-      <div className="flex items-center h-20 px-4 safe-area-top">
+      {/* Header Bar with Hamburger Button and Logo - Semi-Glass */}
+      <div className="flex items-center h-20 px-4">
         {/* Hamburger Button */}
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
           className="
             p-3
             text-[var(--color-text-primary)]
-            hover:bg-[var(--color-surface-elevated)]/80
-            rounded-lg
+            hover:bg-white/40
+            rounded-xl
             transition-all duration-200
           "
           aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
@@ -88,12 +89,17 @@ export const Navbar: React.FC = () => {
           </div>
         </button>
 
-        {/* Logo/Brand */}
-        <div className="flex items-center gap-3 ml-4 px-3 py-2 bg-[var(--color-surface-elevated)]/80 backdrop-blur-sm rounded-lg">
+        {/* Logo/Brand with glass effect */}
+        <div className="flex items-center gap-3 ml-4 px-4 py-2 bg-white/40 backdrop-blur-md rounded-2xl border border-white/30 shadow-sm">
           <span className="text-2xl">🍳</span>
           <span className="text-xl font-bold text-[var(--color-primary)]">
             Rem-E
           </span>
+        </div>
+
+        {/* Theme Toggle - positioned on the right */}
+        <div className="ml-auto">
+          <ThemeToggle />
         </div>
       </div>
 
@@ -111,13 +117,15 @@ export const Navbar: React.FC = () => {
         }}
       />
 
-      {/* Menu Panel - slides from left with smooth animation */}
+      {/* Menu Panel - slides from left with glass effect */}
       <nav
         className={`
           fixed top-0 left-0 bottom-0 z-[var(--z-modal)]
           w-80 max-w-[85vw]
-          bg-[var(--color-surface-elevated)]
-          shadow-2xl
+          bg-white/70
+          backdrop-blur-2xl
+          border-r border-white/30
+          shadow-[4px_0_24px_rgba(230,126,34,0.15)]
           transition-transform duration-300 ease-in-out
           ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
           safe-area-left safe-area-top safe-area-bottom
@@ -142,7 +150,7 @@ export const Navbar: React.FC = () => {
             </div>
             <button
               onClick={() => setIsMenuOpen(false)}
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors p-2 rounded-lg hover:bg-[var(--color-surface)]"
+              className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors p-2 rounded-xl hover:bg-white/30"
               aria-label="Cerrar menú"
             >
               <svg
@@ -172,12 +180,12 @@ export const Navbar: React.FC = () => {
                   className={`
                     flex items-center gap-4
                     px-4 py-4
-                    rounded-xl
+                    rounded-2xl
                     transition-all duration-200
                     ${
                       active
-                        ? 'bg-[var(--color-primary)] text-white shadow-md'
-                        : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]'
+                        ? 'bg-[var(--color-primary)] text-white shadow-lg backdrop-blur-sm'
+                        : 'text-[var(--color-text-secondary)] hover:bg-white/40 hover:text-[var(--color-text-primary)] hover:backdrop-blur-sm'
                     }
                   `}
                   style={{
