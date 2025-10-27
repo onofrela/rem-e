@@ -342,7 +342,7 @@ export default function InventoryPage() {
                   <Button variant="secondary" fullWidth className="text-sm">
                     Editar
                   </Button>
-                  <Button variant="outline" fullWidth className="text-sm">
+                  <Button variant="ghost" fullWidth className="text-sm">
                     Usar
                   </Button>
                 </div>
