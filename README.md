@@ -1,36 +1,143 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Rem-E - Asistente de Cocina Inteligente 🍳
 
-## Getting Started
+> **Prototipo Frontend** - Tu asistente de cocina inteligente y privado que funciona completamente offline
 
-First, run the development server:
+![Version](https://img.shields.io/badge/version-1.0.0-orange)
+![Next.js](https://img.shields.io/badge/Next.js-16.0-black)
+![PWA](https://img.shields.io/badge/PWA-Enabled-blue)
+![Privacy](https://img.shields.io/badge/Privacy-First-green)
+
+## 🌟 Características Principales
+
+### ✅ Implementado en este Prototipo
+
+#### 🍽 **Cook Now Flow** (Cocinar Ahora)
+- **3 Métodos de Input de Ingredientes:**
+  - 📷 **Foto**: Captura foto de tu refrigerador con detección simulada por IA
+  - ✍️ **Manual**: Búsqueda con autocomplete y selección rápida
+  - 💡 **Sugerencias**: Conjuntos predefinidos de ingredientes comunes
+
+#### 🔍 **Recipe Suggestions** (Sugerencias de Recetas)
+- Motor de recomendaciones que analiza ingredientes disponibles
+- Filtros: Tiempo máximo y Dificultad
+- **Match Score**: Muestra % de coincidencia con tus ingredientes
+- Indica ingredientes faltantes
+
+#### 📖 **Recipe Detail Page** (Detalle de Receta)
+- Ajustador de porciones con cálculo automático
+- Lista de ingredientes interactiva con checkboxes
+- Modal de sustituciones con explicaciones
+- Vista previa de pasos
+
+#### 🍳 **Interactive Cooking Mode** (Modo Guía Interactiva)
+- Guía paso a paso inmersiva con pantalla completa
+- **Control por Voz** (Web Speech API)
+- Sistema de timers múltiples
+- Tap anywhere para avanzar
+- Tips y advertencias contextuales
+- Screen Wake Lock
+
+#### 📅 **Weekly Planner** + 📖 **My Recipes** + 🎓 **Learning** + ⚙️ **Settings**
+- Todas las secciones implementadas con UI funcional
+- Planificador con configuración de presupuesto
+- Biblioteca de recetas con búsqueda
+- Dashboard de progreso
+- Configuración completa de privacidad
+
+### 🎨 **Design System**
+- Paleta de colores cálidos (naranja #FF6B35, terracota #E07A5F)
+- Componentes reutilizables: Button, Card, Input, Badge
+- Dark mode support
+- Responsive: Mobile-first → Tablet → Desktop
+
+## 🚀 Instalación y Uso
 
 ```bash
+# Instalar dependencias
+npm install
+
+# Iniciar servidor de desarrollo
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Abrir en navegador
+# http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🗂 Estructura
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+rem-e/
+├── app/                    # Next.js pages
+│   ├── cook/              # Ingredient input + suggestions
+│   ├── recipes/[id]/      # Recipe detail + guide
+│   ├── plan/              # Weekly planner
+│   ├── learn/             # Learning section
+│   └── settings/          # Settings
+├── components/
+│   ├── ui/               # Reusable components
+│   └── layout/           # Navigation
+├── lib/
+│   ├── api/mock-api.ts   # 🔌 Ready for Python backend
+│   ├── hooks/useVoice.ts # Voice control
+│   └── utils/mock-data.ts # 5 demo recipes
+└── styles/theme.css      # Design tokens
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🔌 Backend Integration
 
-## Learn More
+El Mock API (`lib/api/mock-api.ts`) está listo para conectarse con un backend Python/FastAPI:
 
-To learn more about Next.js, take a look at the following resources:
+```typescript
+// Actualmente mock, fácil de reemplazar
+api.detectIngredients(image)     // → POST /api/detect-ingredients
+api.getRecipeSuggestions(...)    // → POST /api/suggest-recipes
+api.getRecipe(id)                // → GET /api/recipes/:id
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🎯 Características UX
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Máximo 2 clics** para cualquier acción principal
+- **Manos libres**: Control por voz completo
+- **Touch targets grandes**: 48px mínimo
+- **Tap anywhere**: Avanza tocando cualquier parte
+- **Accesibilidad**: WCAG AA, font ajustable, screen reader ready
 
-## Deploy on Vercel
+## 🔒 Privacidad
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- ✅ 100% Offline por defecto
+- ✅ Cero tracking
+- ✅ No requiere cuenta
+- ✅ Datos solo localmente
+- ✅ Exportar/Borrar datos disponible
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📊 Datos Demo
+
+- 5 Recetas completas (Tacos, Pasta, Ensalada, Arroz con Pollo, Quesadillas)
+- 100+ Ingredientes
+- Pasos detallados con tips y advertencias
+
+## 🛠 Tecnologías
+
+- Next.js 16 + React 19 + TypeScript
+- Tailwind CSS 4
+- PWA con service worker
+- Web Speech API para voz
+- LocalStorage + IndexedDB
+
+## 📱 Rutas Disponibles
+
+- `/` - Home
+- `/cook` - Input ingredientes
+- `/cook/suggestions` - Sugerencias
+- `/recipes` - Biblioteca
+- `/recipes/[id]` - Detalle
+- `/recipes/[id]/guide` - Guía interactiva
+- `/plan` - Planificador
+- `/learn` - Aprendizaje
+- `/settings` - Configuración
+
+---
+
+**Desarrollado con ❤️ para hacer la cocina más accesible**
+
+🍳 Rem-E v1.0.0 | Offline-First | Privacy-Focused | 100% Functional Frontend
