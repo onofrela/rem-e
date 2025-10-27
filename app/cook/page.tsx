@@ -87,16 +87,16 @@ export default function CookPage() {
     <MainLayout>
       <div className="min-h-screen pb-24 md:pb-8">
         {/* Header */}
-        <div className="bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-secondary)] text-white py-6 sm:py-8 px-4 md:px-6">
+        <div className="py-6 sm:py-8 px-4 md:px-6">
           <div className="container mx-auto max-w-4xl">
             <button
               onClick={() => router.back()}
-              className="mb-4 text-white/80 hover:text-white transition-colors min-h-[44px] flex items-center"
+              className="mb-4 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors min-h-[44px] flex items-center"
             >
               ← Volver
             </button>
-            <h1 className="text-2xl sm:text-3xl font-bold mb-2 animate-fadeInDown">🍽 Cocinar Ahora</h1>
-            <p className="text-sm sm:text-base text-white/90">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-[var(--color-text-primary)] animate-fadeInDown">🍽 Cocinar Ahora</h1>
+            <p className="text-sm sm:text-base text-[var(--color-text-secondary)]">
               Dime qué ingredientes tienes y te sugeriré recetas deliciosas
             </p>
           </div>

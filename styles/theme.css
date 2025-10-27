@@ -96,8 +96,10 @@
   --z-dropdown: 1000;
   --z-sticky: 1100;
   --z-fixed: 1200;
+  --z-overlay: 1300;
   --z-modal-backdrop: 1300;
   --z-modal: 1400;
+  --z-modal-content: 1450;
   --z-toast: 1500;
 
   /* === Touch Targets === */
@@ -218,6 +220,15 @@ body {
   }
 }
 
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -251,10 +262,19 @@ body {
 
 @keyframes slideInLeft {
   from {
-    transform: translateX(100%);
+    transform: translateX(-100%);
   }
   to {
     transform: translateX(0);
+  }
+}
+
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
   }
 }
 

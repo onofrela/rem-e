@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -17,105 +17,181 @@ const navItems: NavItem[] = [
   { id: 'home', label: 'Inicio', icon: '🏠', href: '/' },
   { id: 'recipes', label: 'Recetas', icon: '📖', href: '/recipes' },
   { id: 'plan', label: 'Planificar', icon: '📅', href: '/plan' },
+  { id: 'settings', label: 'Ajustes', icon: '⚙️', href: '/settings' },
 ];
 
 export const Navbar: React.FC = () => {
   const pathname = usePathname();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   };
 
+  // Close menu when route changes
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
+
+  // Prevent body scroll when menu is open
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMenuOpen]);
+
   return (
     <>
-      {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[var(--z-fixed)] bg-[var(--color-surface-elevated)] border-t border-[var(--color-border)] safe-area-bottom">
-        <div className="flex items-center justify-around h-16">
-          {navItems.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className={`
-                  flex flex-col items-center justify-center gap-1
-                  min-w-[64px] h-full
-                  transition-colors duration-200
-                  ${active
-                    ? 'text-[var(--color-primary)]'
-                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                  }
-                `}
-              >
-                <span className="text-2xl">{item.icon}</span>
-                <span className="text-xs font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      {/* Header Bar with Hamburger Button and Logo */}
+      <div className="flex items-center h-20 px-4 safe-area-top">
+        {/* Hamburger Button */}
+        <button
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className="
+            p-3
+            text-[var(--color-text-primary)]
+            hover:bg-[var(--color-surface-elevated)]/80
+            rounded-lg
+            transition-all duration-200
+          "
+          aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={isMenuOpen}
+        >
+          <div className="w-6 h-5 flex flex-col justify-between">
+            <span
+              className={`
+                block h-0.5 w-full bg-current rounded-full
+                transition-all duration-300 ease-in-out origin-center
+                ${isMenuOpen ? 'rotate-45 translate-y-2' : 'rotate-0'}
+              `}
+            />
+            <span
+              className={`
+                block h-0.5 w-full bg-current rounded-full
+                transition-all duration-300 ease-in-out
+                ${isMenuOpen ? 'opacity-0 scale-0' : 'opacity-100 scale-100'}
+              `}
+            />
+            <span
+              className={`
+                block h-0.5 w-full bg-current rounded-full
+                transition-all duration-300 ease-in-out origin-center
+                ${isMenuOpen ? '-rotate-45 -translate-y-2' : 'rotate-0'}
+              `}
+            />
+          </div>
+        </button>
 
-      {/* Tablet/Desktop Side Rail */}
-      <nav className="hidden md:flex fixed left-0 top-0 bottom-0 z-[var(--z-fixed)] w-20 lg:w-64 bg-[var(--color-surface-elevated)] border-r border-[var(--color-border)] flex-col safe-area-left safe-area-top safe-area-bottom">
         {/* Logo/Brand */}
-        <div className="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-[var(--color-border)]">
+        <div className="flex items-center gap-3 ml-4 px-3 py-2 bg-[var(--color-surface-elevated)]/80 backdrop-blur-sm rounded-lg">
           <span className="text-2xl">🍳</span>
-          <span className="hidden lg:inline ml-3 text-xl font-bold text-[var(--color-primary)]">
+          <span className="text-xl font-bold text-[var(--color-primary)]">
             Rem-E
           </span>
         </div>
+      </div>
 
-        {/* Nav Items */}
-        <div className="flex-1 py-6">
-          {navItems.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className={`
-                  flex items-center gap-4
-                  h-14 mb-2 mx-2 px-4
-                  rounded-xl
-                  transition-all duration-200
-                  ${active
-                    ? 'bg-[var(--color-primary)] text-white shadow-md'
-                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]'
-                  }
-                `}
-              >
-                <span className="text-2xl flex-shrink-0">{item.icon}</span>
-                <span className="hidden lg:inline font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
+      {/* Backdrop with blur - animated */}
+      <div
+        className={`
+          fixed inset-0 z-[var(--z-overlay)]
+          bg-black/60 backdrop-blur-md
+          transition-all duration-300 ease-in-out
+          ${isMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}
+        `}
+        onClick={() => setIsMenuOpen(false)}
+        style={{
+          animation: isMenuOpen ? 'fadeIn 0.3s ease-in-out' : 'fadeOut 0.3s ease-in-out'
+        }}
+      />
 
-        {/* Settings Link */}
-        <div className="p-2 border-t border-[var(--color-border)]">
-          <Link
-            href="/settings"
-            className={`
-              flex items-center gap-4
-              h-14 px-4
-              rounded-xl
-              transition-all duration-200
-              ${pathname === '/settings'
-                ? 'bg-[var(--color-primary)] text-white shadow-md'
-                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]'
-              }
-            `}
+      {/* Menu Panel - slides from left with smooth animation */}
+      <nav
+        className={`
+          fixed top-0 left-0 bottom-0 z-[var(--z-modal)]
+          w-80 max-w-[85vw]
+          bg-[var(--color-surface-elevated)]
+          shadow-2xl
+          transition-transform duration-300 ease-in-out
+          ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+          safe-area-left safe-area-top safe-area-bottom
+        `}
+        style={{
+          animation: isMenuOpen ? 'slideInLeft 0.3s ease-out' : 'slideOutLeft 0.3s ease-in'
+        }}
+      >
+        <div className="flex flex-col h-full px-6 py-8">
+          {/* Logo/Brand in menu */}
+          <div
+            className="flex items-center justify-between mb-8"
+            style={{
+              animation: isMenuOpen ? 'fadeIn 0.4s ease-out 0.1s backwards' : 'none'
+            }}
           >
-            <span className="text-2xl flex-shrink-0">⚙️</span>
-            <span className="hidden lg:inline font-medium">Ajustes</span>
-          </Link>
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">🍳</span>
+              <span className="text-2xl font-bold text-[var(--color-primary)]">
+                Rem-E
+              </span>
+            </div>
+            <button
+              onClick={() => setIsMenuOpen(false)}
+              className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors p-2 rounded-lg hover:bg-[var(--color-surface)]"
+              aria-label="Cerrar menú"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Nav Items with staggered animation */}
+          <div className="flex-1 space-y-2 overflow-y-auto">
+            {navItems.map((item, index) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={`
+                    flex items-center gap-4
+                    px-4 py-4
+                    rounded-xl
+                    transition-all duration-200
+                    ${
+                      active
+                        ? 'bg-[var(--color-primary)] text-white shadow-md'
+                        : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]'
+                    }
+                  `}
+                  style={{
+                    animation: isMenuOpen ? `fadeIn 0.3s ease-out ${0.1 + index * 0.05}s backwards` : 'none'
+                  }}
+                >
+                  <span className="text-2xl">{item.icon}</span>
+                  <span className="text-lg font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </nav>
-
-      {/* Spacer to prevent content from going under navbar */}
-      <div className="md:hidden h-16" />
-      <div className="hidden md:block w-20 lg:w-64 flex-shrink-0" />
     </>
   );
 };

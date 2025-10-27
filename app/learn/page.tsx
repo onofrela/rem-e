@@ -18,7 +18,7 @@ export default function LearnPage() {
   return (
     <MainLayout>
       <div className="min-h-screen pb-24 md:pb-8">
-        <div className="bg-gradient-to-b from-[var(--color-success)] to-[var(--color-background)] py-6 sm:py-8 px-4 md:px-6">
+        <div className="py-6 sm:py-8 px-4 md:px-6">
           <div className="container mx-auto max-w-4xl">
             <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-[var(--color-text-primary)] animate-fadeInDown">
               🎓 Aprender

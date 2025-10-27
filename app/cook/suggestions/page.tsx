@@ -74,16 +74,16 @@ export default function SuggestionsPage() {
     <MainLayout>
       <div className="min-h-screen pb-24 md:pb-8">
         {/* Header */}
-        <div className="bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-secondary)] text-white py-8 px-6">
+        <div className="py-8 px-6">
           <div className="container mx-auto max-w-4xl">
             <button
               onClick={() => router.back()}
-              className="mb-4 text-white/80 hover:text-white transition-colors"
+              className="mb-4 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
             >
               ← Cambiar ingredientes
             </button>
-            <h1 className="text-3xl font-bold mb-2">Recetas Sugeridas</h1>
-            <p className="text-white/90">
+            <h1 className="text-3xl font-bold mb-2 text-[var(--color-text-primary)]">Recetas Sugeridas</h1>
+            <p className="text-[var(--color-text-secondary)]">
               Encontramos {suggestions.length} receta{suggestions.length !== 1 ? 's' : ''} para ti
             </p>
           </div>

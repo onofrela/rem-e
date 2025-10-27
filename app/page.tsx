@@ -23,7 +23,7 @@ export default function Home() {
     <MainLayout>
       <div className="min-h-screen pb-20 md:pb-8">
         {/* Header Section */}
-        <div className="bg-gradient-to-b from-[var(--color-accent)] to-[var(--color-background)] pt-8 pb-12 px-4 md:px-6">
+        <div className="pt-8 pb-12 px-4 md:px-6">
           <div className="container mx-auto max-w-4xl">
             <div className="flex items-center justify-between mb-2 animate-fadeInDown">
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[var(--color-primary)]">

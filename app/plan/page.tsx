@@ -10,10 +10,10 @@ export default function PlanPage() {
   return (
     <MainLayout>
       <div className="min-h-screen pb-24 md:pb-8">
-        <div className="bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-secondary)] text-white py-8 px-6">
+        <div className="py-8 px-6">
           <div className="container mx-auto max-w-4xl">
-            <h1 className="text-3xl font-bold mb-2">📅 Planificador Semanal</h1>
-            <p className="text-white/90">Organiza tus comidas y ahorra tiempo</p>
+            <h1 className="text-3xl font-bold mb-2 text-[var(--color-text-primary)]">📅 Planificador Semanal</h1>
+            <p className="text-[var(--color-text-secondary)]">Organiza tus comidas y ahorra tiempo</p>
           </div>
         </div>
 

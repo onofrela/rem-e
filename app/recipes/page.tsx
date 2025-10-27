@@ -23,7 +23,7 @@ export default function RecipesPage() {
     <MainLayout>
       <div className="min-h-screen pb-24 md:pb-8">
         {/* Header */}
-        <div className="bg-gradient-to-b from-[var(--color-secondary)] to-[var(--color-background)] py-8 px-6">
+        <div className="py-8 px-6">
           <div className="container mx-auto max-w-4xl">
             <h1 className="text-3xl font-bold mb-2 text-[var(--color-text-primary)]">
               📖 Mis Recetas
