@@ -122,9 +122,9 @@ export default function InventoryPage() {
           {alerts.length > 0 && (
             <div className="mb-6 animate-fadeIn">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl">🤖</span>
+                <span className="text-2xl">🚨</span>
                 <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
-                  Alertas Inteligentes
+                  Alertas
                 </h2>
                 <Badge variant="error">{alerts.length}</Badge>
               </div>
@@ -140,10 +140,10 @@ export default function InventoryPage() {
                     <div className="flex items-start gap-3">
                       <span className="text-2xl">{getAlertIcon(alert.type)}</span>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                        <p className="text-sm font-medium text-black">
                           {alert.message}
                         </p>
-                        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                        <p className="text-xs text-gray-500 mt-1">
                           {alert.type === 'low_stock' && 'Considera agregarlo a tu lista de compras'}
                           {alert.type === 'expiring_soon' && 'Úsalo pronto para evitar desperdicios'}
                           {alert.type === 'expired' && 'Revisa el producto antes de usarlo'}
@@ -171,7 +171,7 @@ export default function InventoryPage() {
             <div className="flex items-center gap-3">
               <span className="text-3xl">🤖</span>
               <div className="flex-1">
-                <h3 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">
+                <h3 className="text-base font-semibold text-gray-900 mb-1">
                   Smart Fridge Detectado
                 </h3>
                 <p className="text-sm text-[var(--color-text-secondary)]">
