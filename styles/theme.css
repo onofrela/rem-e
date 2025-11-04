@@ -156,23 +156,11 @@
   --color-background-gradient-end: #FFD4B8;
 }
 
-/* Dark Mode */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #1A1A1A;
-    --color-surface: #2B2B2B;
-    --color-surface-elevated: #353535;
-    --color-border: #404040;
-    --color-border-light: #333333;
-
-    --color-text-primary: #FFFFFF;
-    --color-text-secondary: #B0B0B0;
-    --color-text-tertiary: #808080;
-    --color-text-inverse: #2B2B2B;
-
-    --color-accent: #3A3631;
-  }
-}
+/* Dark Mode - REMOVED
+ * IMPORTANT: Dark theme/dark mode is FORBIDDEN in this application.
+ * The design system is built exclusively for LIGHT THEME with warm, fresh aesthetics.
+ * This legacy code has been removed to prevent dark mode activation.
+ */
 
 /* === Base Styles === */
 *,
@@ -489,4 +477,152 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* === Home Page Styles === */
+/* IMPORTANT: These styles are designed for LIGHT THEME ONLY.
+ * DO NOT use dark theme or dark mode for these components.
+ * The design system enforces a light, fresh aesthetic with warm colors. */
+
+/* Hero card with primary background color (Cook Now section) */
+.home-hero-card {
+  background-color: var(--color-primary);
+}
+
+/* Suggestion card image section with primary background */
+.home-suggestion-image {
+  background-color: var(--color-primary);
+}
+
+/* === Recipe Carousel Styles === */
+/* IMPORTANT: These styles are designed for LIGHT THEME ONLY.
+ * DO NOT use dark theme or dark mode for carousel components. */
+
+.recipe-carousel-section {
+  margin-bottom: var(--space-xl);
+}
+
+.carousel-container {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  padding: 0 var(--space-sm) var(--space-sm);
+}
+
+.carousel-container::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.carousel-content {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: calc(50% - 8px); /* 2 cards on mobile */
+  gap: 1rem;
+  padding-bottom: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .carousel-content {
+    grid-auto-columns: calc(33.333% - 12px); /* 3 cards on tablet */
+    gap: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .carousel-content {
+    grid-auto-columns: calc(25% - 15px); /* 4 cards on desktop */
+    gap: 1.25rem;
+  }
+}
+
+/* Carousel Arrow Buttons */
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition-base), background-color var(--transition-base), transform var(--transition-fast);
+  box-shadow: var(--shadow-lg);
+}
+
+.carousel-arrow:hover {
+  background-color: var(--color-primary-dark);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.carousel-arrow:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* Show arrows on hover or on touch devices */
+.group:hover .carousel-arrow,
+.carousel-arrow:focus-visible {
+  opacity: 1;
+}
+
+/* Always show arrows on touch devices */
+@media (hover: none) {
+  .carousel-arrow {
+    opacity: 0.9;
+  }
+
+  .carousel-arrow:hover {
+    background-color: var(--color-primary);
+    transform: translateY(-50%);
+  }
+}
+
+.carousel-arrow-left {
+  left: var(--space-sm);
+}
+
+.carousel-arrow-right {
+  right: var(--space-sm);
+}
+
+/* Recipe Card specific styles */
+.recipe-card {
+  scroll-snap-align: start;
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.recipe-card:hover {
+  transform: translateY(-4px);
+}
+
+/* Ensure cards have consistent height */
+.recipe-card .card {
+  min-height: 100%;
+}
+
+/* Line clamp utilities */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

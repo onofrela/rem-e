@@ -8,6 +8,7 @@ export interface Recipe {
   difficulty: 'Fácil' | 'Intermedio' | 'Avanzado';
   servings: number;
   image: string;
+  category: 'Carnes y aves' | 'Pastas' | 'Ensaladas' | 'Snacks y antojitos' | 'Sopas' | 'Postres' | 'Otros';
   ingredients: Ingredient[];
   steps: RecipeStep[];
   tags: string[];
@@ -38,6 +39,7 @@ export const mockRecipes: Recipe[] = [
     difficulty: 'Fácil',
     servings: 4,
     image: '/recipes/tacos.jpg',
+    category: 'Carnes y aves',
     ingredients: [
       { name: 'Pechuga de pollo', amount: 500, unit: 'g' },
       { name: 'Tortillas', amount: 8, unit: 'piezas' },
@@ -66,6 +68,7 @@ export const mockRecipes: Recipe[] = [
     difficulty: 'Fácil',
     servings: 2,
     image: '/recipes/pasta.jpg',
+    category: 'Pastas',
     ingredients: [
       { name: 'Pasta fettuccine', amount: 200, unit: 'g' },
       { name: 'Crema', amount: 200, unit: 'ml' },
@@ -93,6 +96,7 @@ export const mockRecipes: Recipe[] = [
     difficulty: 'Fácil',
     servings: 2,
     image: '/recipes/caesar.jpg',
+    category: 'Ensaladas',
     ingredients: [
       { name: 'Lechuga romana', amount: 1, unit: 'pieza' },
       { name: 'Pechuga de pollo', amount: 200, unit: 'g', optional: true },
@@ -120,6 +124,7 @@ export const mockRecipes: Recipe[] = [
     difficulty: 'Intermedio',
     servings: 6,
     image: '/recipes/arroz-pollo.jpg',
+    category: 'Carnes y aves',
     ingredients: [
       { name: 'Pollo', amount: 1, unit: 'kg' },
       { name: 'Arroz', amount: 400, unit: 'g' },
@@ -151,6 +156,7 @@ export const mockRecipes: Recipe[] = [
     difficulty: 'Fácil',
     servings: 2,
     image: '/recipes/quesadillas.jpg',
+    category: 'Snacks y antojitos',
     ingredients: [
       { name: 'Tortillas', amount: 4, unit: 'piezas' },
       { name: 'Queso Oaxaca', amount: 200, unit: 'g' },

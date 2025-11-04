@@ -41,8 +41,7 @@ export default function Home() {
                 variant="elevated"
                 padding="lg"
                 hoverable
-                className="h-full animate-scaleIn flex flex-col justify-center relative overflow-hidden"
-                style={{ backgroundColor: 'var(--color-primary)' }}
+                className="h-full animate-scaleIn flex flex-col justify-center relative overflow-hidden home-hero-card"
               >
                 <div className="relative flex flex-row md:flex-row items-center md:justify-between text-white h-full md:px-4">
                   <div className="text-left md:text-left flex-1">
@@ -94,7 +93,7 @@ export default function Home() {
                 </div>
 
                 {/* Recipe Image */}
-                <div className="w-32 md:w-48 lg:w-56 flex items-center justify-center text-white text-5xl md:text-7xl lg:text-8xl flex-shrink-0 border-l border-white/20" style={{ backgroundColor: 'var(--color-primary)' }}>
+                <div className="w-32 md:w-48 lg:w-56 flex items-center justify-center text-white text-5xl md:text-7xl lg:text-8xl flex-shrink-0 border-l border-white/20 home-suggestion-image">
                   🍽
                 </div>
               </Card>
