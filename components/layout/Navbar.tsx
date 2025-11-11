@@ -5,21 +5,30 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Logo } from '@/components/ui/Logo';
+import {
+  Home,
+  UtensilsCrossed,
+  Package,
+  BookOpen,
+  Calendar,
+  Settings,
+  LucideIcon
+} from 'lucide-react';
 
 interface NavItem {
   id: string;
   label: string;
-  icon: string;
+  icon: LucideIcon;
   href: string;
 }
 
 const navItems: NavItem[] = [
-  { id: 'home', label: 'Inicio', icon: '🏠', href: '/' },
-  { id: 'cook', label: 'Cocinar', icon: '🍽', href: '/cook' },
-  { id: 'inventory', label: 'Inventario', icon: '🥫', href: '/inventory' },
-  { id: 'recipes', label: 'Recetas', icon: '📖', href: '/recipes' },
-  { id: 'plan', label: 'Planificar', icon: '📅', href: '/plan' },
-  { id: 'settings', label: 'Ajustes', icon: '⚙️', href: '/settings' },
+  { id: 'home', label: 'Inicio', icon: Home, href: '/' },
+  { id: 'cook', label: 'Cocinar', icon: UtensilsCrossed, href: '/cook' },
+  { id: 'inventory', label: 'Inventario', icon: Package, href: '/inventory' },
+  { id: 'recipes', label: 'Recetas', icon: BookOpen, href: '/recipes' },
+  { id: 'plan', label: 'Planificar', icon: Calendar, href: '/plan' },
+  { id: 'settings', label: 'Ajustes', icon: Settings, href: '/settings' },
 ];
 
 export const Navbar: React.FC = () => {
@@ -118,15 +127,15 @@ export const Navbar: React.FC = () => {
         }}
       />
 
-      {/* Menu Panel - slides from left with glass effect */}
+      {/* Menu Panel - slides from left with improved glass effect */}
       <nav
         className={`
           fixed top-0 left-0 bottom-0 z-[var(--z-modal)]
           w-80 max-w-[85vw]
-          bg-white/70
-          backdrop-blur-2xl
-          border-r border-white/30
-          shadow-[4px_0_24px_rgba(230,126,34,0.15)]
+          bg-gradient-to-b from-white/95 via-[rgba(245,250,243,0.95)] to-white/95
+          backdrop-blur-xl
+          border-r border-[var(--color-primary)]/20
+          shadow-[4px_0_32px_rgba(151,194,138,0.2)]
           transition-transform duration-300 ease-in-out
           ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
           safe-area-left safe-area-top safe-area-bottom
@@ -171,31 +180,56 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* Nav Items with staggered animation */}
-          <div className="flex-1 space-y-2 overflow-y-auto">
+          <div className="flex-1 space-y-1 overflow-y-auto">
             {navItems.map((item, index) => {
               const active = isActive(item.href);
+              const Icon = item.icon;
+              // Add separator before "Ajustes"
+              const showSeparator = item.id === 'settings';
+
               return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  className={`
-                    flex items-center gap-4
-                    px-4 py-4
-                    rounded-2xl
-                    transition-all duration-200
-                    ${
-                      active
-                        ? 'bg-[var(--color-primary)] text-white shadow-lg backdrop-blur-sm'
-                        : 'text-[var(--color-text-secondary)] hover:bg-white/40 hover:text-[var(--color-text-primary)] hover:backdrop-blur-sm'
-                    }
-                  `}
-                  style={{
-                    animation: isMenuOpen ? `fadeIn 0.3s ease-out ${0.1 + index * 0.05}s backwards` : 'none'
-                  }}
-                >
-                  <span className="text-2xl">{item.icon}</span>
-                  <span className="text-lg font-medium">{item.label}</span>
-                </Link>
+                <React.Fragment key={item.id}>
+                  {showSeparator && (
+                    <div
+                      className="my-3 mx-4 border-t border-[var(--color-primary)]/15"
+                      style={{
+                        animation: isMenuOpen ? `fadeIn 0.3s ease-out ${0.1 + index * 0.05}s backwards` : 'none'
+                      }}
+                    />
+                  )}
+                  <Link
+                    href={item.href}
+                    className={`
+                      relative flex items-center gap-4
+                      px-5 py-4
+                      rounded-2xl
+                      transition-all duration-200
+                      ${
+                        active
+                          ? 'bg-[var(--color-primary)] text-white shadow-lg shadow-[var(--color-primary)]/30'
+                          : 'text-[var(--color-text-primary)] hover:bg-white/60 hover:shadow-md'
+                      }
+                    `}
+                    style={{
+                      animation: isMenuOpen ? `fadeIn 0.3s ease-out ${0.1 + index * 0.05}s backwards` : 'none'
+                    }}
+                  >
+                    {/* iOS-style active indicator bar */}
+                    {active && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
+                    )}
+
+                    {/* Icon with filled style */}
+                    <Icon
+                      className={`w-6 h-6 ${active ? 'fill-white' : 'fill-[var(--color-primary)]'}`}
+                      strokeWidth={0}
+                    />
+
+                    <span className={`text-lg font-semibold ${active ? 'text-white' : 'text-[var(--color-text-primary)]'}`}>
+                      {item.label}
+                    </span>
+                  </Link>
+                </React.Fragment>
               );
             })}
           </div>

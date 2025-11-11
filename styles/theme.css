@@ -24,6 +24,13 @@
   --glass-blur: 20px;
   --glass-blur-heavy: 40px;
 
+  /* Navbar Enhanced Glassmorphism - iOS/Alexa Show Style */
+  --navbar-glass-bg: rgba(255, 255, 255, 0.95);
+  --navbar-glass-bg-tint: rgba(245, 250, 243, 0.95); /* Pistachio tint */
+  --navbar-glass-border: rgba(151, 194, 138, 0.2);
+  --navbar-glass-shadow: rgba(151, 194, 138, 0.2);
+  --navbar-glass-blur: 24px;
+
   /* Gradient Orb Colors for Background */
   --orb-pistachio: #ABD39F;
   --orb-sage: #9DC88D;
@@ -143,6 +150,11 @@
 
   /* Glassmorphism Variables */
   --glass-shadow: rgba(250, 133, 2, 0.1);
+
+  /* Navbar Enhanced Glassmorphism - iOS/Alexa Show Style */
+  --navbar-glass-bg-tint: rgba(255, 248, 243, 0.95); /* Orange tint */
+  --navbar-glass-border: rgba(250, 133, 2, 0.2);
+  --navbar-glass-shadow: rgba(250, 133, 2, 0.2);
 
   /* Gradient Orb Colors for Background */
   --orb-pistachio: #FF8C42;
