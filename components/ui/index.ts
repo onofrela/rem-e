@@ -10,6 +10,8 @@ export type { InputProps } from './Input';
 export { Badge } from './Badge';
 export type { BadgeProps } from './Badge';
 
+export { Logo } from './Logo';
+
 export { RecipeCard } from './RecipeCard';
 
 export { RecipeCarousel } from './RecipeCarousel';

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { Logo } from '@/components/ui/Logo';
 
 interface NavItem {
   id: string;
@@ -13,9 +14,9 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { id: 'home', label: 'Inicio', icon: '🏠', href: '/' },
   { id: 'cook', label: 'Cocinar', icon: '🍽', href: '/cook' },
   { id: 'inventory', label: 'Inventario', icon: '🥫', href: '/inventory' },
-  { id: 'home', label: 'Inicio', icon: '🏠', href: '/' },
   { id: 'recipes', label: 'Recetas', icon: '📖', href: '/recipes' },
   { id: 'plan', label: 'Planificar', icon: '📅', href: '/plan' },
   { id: 'settings', label: 'Ajustes', icon: '⚙️', href: '/settings' },
@@ -91,7 +92,7 @@ export const Navbar: React.FC = () => {
 
         {/* Logo/Brand with glass effect */}
         <div className="flex items-center gap-3 ml-4 px-4 py-2 bg-white/40 backdrop-blur-md rounded-2xl border border-white/30 shadow-sm">
-          <span className="text-2xl">🍳</span>
+          <Logo size={28} className="text-[var(--color-primary)]" />
           <span className="text-xl font-bold text-[var(--color-primary)]">
             Rem-E
           </span>
@@ -143,7 +144,7 @@ export const Navbar: React.FC = () => {
             }}
           >
             <div className="flex items-center gap-3">
-              <span className="text-3xl">🍳</span>
+              <Logo size={36} className="text-[var(--color-primary)]" />
               <span className="text-2xl font-bold text-[var(--color-primary)]">
                 Rem-E
               </span>
