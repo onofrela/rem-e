@@ -31,9 +31,9 @@ export default function Home() {
         </div>
 
         {/* Grid Container */}
-        <div className="flex-1 p-4 md:p-6 lg:p-8 min-h-0 overflow-auto"> {/* clave: flex-1 y min-h-0 */}
+        <div className="flex-1 p-4 md:p-6 lg:p-8 min-h-0"> {/* clave: flex-1 y min-h-0, sin overflow-auto */}
           {/* Mobile: 2-column vertical | Tablet: 4-column horizontal grid with variable sizes */}
-          <div className="grid grid-cols-2 md:grid-cols-4 auto-rows-[minmax(140px,auto)] md:auto-rows-[minmax(240px,1fr)] gap-3 md:gap-5 lg:gap-6 w-full h-full"> 
+          <div className="grid grid-cols-2 md:grid-cols-4 grid-rows-[1fr_1fr_1fr_1fr] md:grid-rows-[1fr_1fr_1fr] gap-3 md:gap-5 lg:gap-6 w-full h-full"> 
 
             {/* Cook Now - 2x2 tile (Hero) */}
             <Link href="/cook" className="col-span-2 row-span-2">
@@ -178,8 +178,8 @@ export default function Home() {
             </Link>
 
           </div>
-          </div>
         </div>
+      </div>
     </MainLayout>
   );
 }
