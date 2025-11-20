@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { api } from '@/lib/api/mock-api';
 import { Recipe } from '@/lib/utils/mock-data';
 import { useVoice, VoiceCommand } from '@/lib/hooks/useVoice';
+import { useElevenLabsTTS } from '@/lib/hooks/useElevenLabsTTS';
 
 export default function CookingGuidePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -25,6 +26,9 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
     language: 'es-MX',
     continuous: true,
   });
+
+  // Text-to-speech with ElevenLabs
+  const { speak, stop: stopSpeech, isLoading: isSpeechLoading, isPlaying: isSpeechPlaying, usingFallback } = useElevenLabsTTS();
 
   useEffect(() => {
     loadRecipe();
@@ -93,10 +97,8 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
   const speakCurrentStep = () => {
     if (!recipe) return;
     const step = recipe.steps.find(s => s.step === currentStep);
-    if (step && 'speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(step.instruction);
-      utterance.lang = 'es-MX';
-      speechSynthesis.speak(utterance);
+    if (step) {
+      speak(step.instruction);
     }
   };
 
@@ -344,11 +346,16 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
           </button>
 
           <button
-            onClick={speakCurrentStep}
-            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-border)] transition-colors"
+            onClick={isSpeechPlaying ? stopSpeech : speakCurrentStep}
+            disabled={isSpeechLoading}
+            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-border)] transition-colors disabled:opacity-50"
           >
-            <span className="text-2xl">🔊</span>
-            <span className="text-xs">Repetir</span>
+            <span className={`text-2xl ${isSpeechLoading ? 'animate-pulse' : ''}`}>
+              {isSpeechLoading ? '⏳' : isSpeechPlaying ? '⏹' : '🔊'}
+            </span>
+            <span className="text-xs">
+              {isSpeechLoading ? 'Cargando' : isSpeechPlaying ? 'Detener' : 'Repetir'}
+            </span>
           </button>
 
           {currentStep < recipe.steps.length ? (
