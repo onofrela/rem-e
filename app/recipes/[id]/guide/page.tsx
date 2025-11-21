@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { api } from '@/lib/api/mock-api';
 import { Recipe } from '@/lib/utils/mock-data';
 import { useVoice, VoiceCommand } from '@/lib/hooks/useVoice';
+import { useGeminiTTS } from '@/lib/hooks/useGeminiTTS';
 
 export default function CookingGuidePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -25,6 +26,9 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
     language: 'es-MX',
     continuous: true,
   });
+
+  // Text-to-speech with Gemini TTS
+  const { speak, stop: stopSpeech, isLoading: isSpeechLoading, isPlaying: isSpeechPlaying, usingFallback } = useGeminiTTS();
 
   useEffect(() => {
     loadRecipe();
