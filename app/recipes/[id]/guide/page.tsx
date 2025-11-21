@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -61,6 +61,21 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
     }
   };
 
+  const speakCurrentStep = useCallback(() => {
+    if (!recipe) return;
+    const step = recipe.steps.find(s => s.step === currentStep);
+    if (step) {
+      speak(step.instruction);
+    }
+  }, [recipe, currentStep, speak]);
+
+  // Auto-play TTS when step changes
+  useEffect(() => {
+    if (recipe && !isPaused) {
+      speakCurrentStep();
+    }
+  }, [currentStep, recipe, isPaused, speakCurrentStep]);
+
   function handleVoiceCommand(command: VoiceCommand, text: string) {
     switch (command) {
       case 'next':
@@ -74,6 +89,7 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
         break;
       case 'pause':
         setIsPaused(true);
+        stopSpeech();
         break;
       case 'resume':
         setIsPaused(false);
@@ -94,27 +110,15 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
     }
   }
 
-  const speakCurrentStep = () => {
-    if (!recipe) return;
-    const step = recipe.steps.find(s => s.step === currentStep);
-    if (step && 'speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(step.instruction);
-      utterance.lang = 'es-MX';
-      speechSynthesis.speak(utterance);
-    }
-  };
-
   const goToNextStep = () => {
     if (recipe && currentStep < recipe.steps.length) {
       setCurrentStep(currentStep + 1);
-      speakCurrentStep();
     }
   };
 
   const goToPreviousStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
-      speakCurrentStep();
     }
   };
 
@@ -155,6 +159,21 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="min-h-screen bg-[var(--color-background)] pb-safe">
+      {/* TTS Loading Overlay */}
+      {isSpeechLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <Card variant="elevated" padding="lg" className="text-center">
+            <div className="text-6xl mb-4 animate-pulse">🎙️</div>
+            <p className="text-xl font-semibold text-[var(--color-text-primary)] mb-2">
+              Preparando audio...
+            </p>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {usingFallback ? 'Usando voz sintética' : 'Generando voz natural con Gemini'}
+            </p>
+          </Card>
+        </div>
+      )}
+
       {/* Minimal Header */}
       <div className="sticky top-0 z-10 bg-[var(--color-surface-elevated)] border-b border-[var(--color-border)] safe-area-top">
         <div className="container mx-auto max-w-3xl px-4 py-3">
@@ -349,10 +368,14 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
 
           <button
             onClick={speakCurrentStep}
-            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-border)] transition-colors"
+            disabled={isSpeechLoading}
+            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-border)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
           >
-            <span className="text-2xl">🔊</span>
+            <span className="text-2xl">{isSpeechPlaying ? '🔊' : '🔇'}</span>
             <span className="text-xs">Repetir</span>
+            {usingFallback && (
+              <span className="absolute top-1 right-1 text-xs">⚠️</span>
+            )}
           </button>
 
           {currentStep < recipe.steps.length ? (
