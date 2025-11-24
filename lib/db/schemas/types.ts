@@ -271,6 +271,127 @@ export interface InventoryAlert {
 }
 
 // =============================================================================
+// APPLIANCE TYPES
+// =============================================================================
+
+/**
+ * Appliance category options
+ */
+export type ApplianceCategory =
+  | 'Cocción'           // Cooking
+  | 'Refrigeración'     // Refrigeration
+  | 'Preparación'       // Prep
+  | 'Limpieza'          // Cleaning
+  | 'Horneado'          // Baking
+  | 'Bebidas'           // Beverages
+  | 'Conservación'      // Preservation
+  | 'Medición'          // Measuring
+  | 'Otro';             // Other
+
+/**
+ * Appliance subcategory options
+ */
+export type ApplianceSubcategory =
+  | 'Hornos' | 'Estufas' | 'Microondas' | 'Freidoras' | 'Parrillas' | 'Ollas eléctricas'
+  | 'Refrigeradores' | 'Congeladores' | 'Enfriadores'
+  | 'Licuadoras' | 'Procesadores' | 'Batidoras' | 'Picadoras' | 'Extractores' | 'Ralladores'
+  | 'Lavavajillas'
+  | 'Batidoras de pie' | 'Amasadoras' | 'Panificadoras'
+  | 'Cafeteras' | 'Exprimidores' | 'Teteras' | 'Dispensadores'
+  | 'Envasadoras' | 'Deshidratadores' | 'Fermentadores'
+  | 'Básculas' | 'Termómetros' | 'Temporizadores' | 'Medidores'
+  | 'Otro';
+
+/**
+ * Technical specifications for an appliance
+ */
+export interface ApplianceSpecifications {
+  capacity?: string;              // e.g., "30L", "1.5L", "12 tazas"
+  power?: string;                 // e.g., "1200W", "800W"
+  powerRange?: string;            // e.g., "1200-2000W"
+  voltage?: string;               // e.g., "110V", "220V"
+  dimensions?: string;            // e.g., "45x35x25cm"
+  weight?: string;                // e.g., "5kg"
+  temperatureRange?: string;      // e.g., "50-250°C"
+  speedSettings?: string;         // e.g., "10 velocidades"
+  material?: string;              // e.g., "Acero inoxidable"
+  [key: string]: string | undefined; // Allow custom specs
+}
+
+/**
+ * Master appliance in the catalog (appliances.json)
+ */
+export interface CatalogAppliance {
+  id: string;                           // e.g., "app_001"
+  name: string;                         // Display name: "Horno eléctrico"
+  normalizedName: string;               // For search: "horno"
+  category: ApplianceCategory;
+  subcategory: ApplianceSubcategory;
+  synonyms: string[];                   // ["horno", "oven", "horno eléctrico"]
+
+  specifications: ApplianceSpecifications;
+  useCases: string[];                   // ["Hornear", "Rostizar", "Gratinar"]
+
+  compatibleWith: string[];             // IDs of compatible appliances
+  alternatives: string[];               // IDs of substitute appliances
+
+  isCommon: boolean;                    // Commonly owned appliance
+  imageUrl?: string;                    // Optional image
+  description?: string;                 // Brief description
+}
+
+/**
+ * Appliance condition status
+ */
+export type ApplianceCondition = 'Excelente' | 'Bueno' | 'Regular' | 'Necesita reparación';
+
+/**
+ * An appliance in the user's kitchen (stored in IndexedDB)
+ */
+export interface UserAppliance {
+  id: string;                           // Unique ID for this user appliance
+  applianceId: string;                  // Reference to CatalogAppliance.id
+
+  // Timestamps
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Appliance alert types
+ */
+export type ApplianceAlertType = 'maintenance_due' | 'warranty_expiring' | 'needs_repair';
+
+/**
+ * An appliance alert
+ */
+export interface ApplianceAlert {
+  id: string;
+  type: ApplianceAlertType;
+  applianceId: string;
+  applianceName: string;
+  message: string;
+  priority: AlertPriority;
+  date: string;
+}
+
+/**
+ * Parameters for searching appliances
+ */
+export interface SearchAppliancesParams {
+  query: string;
+  category?: ApplianceCategory;
+  limit?: number;
+}
+
+/**
+ * Parameters for adding a user appliance
+ */
+export interface AddUserApplianceParams {
+  applianceId: string;
+}
+
+// =============================================================================
 // COMPATIBILITY TYPES
 // =============================================================================
 
@@ -427,4 +548,12 @@ export interface IngredientsDatabase {
 export interface RecipesDatabase {
   metadata: DatabaseMetadata;
   recipes: Recipe[];
+}
+
+/**
+ * Appliances database structure
+ */
+export interface AppliancesDatabase {
+  metadata: DatabaseMetadata;
+  appliances: CatalogAppliance[];
 }

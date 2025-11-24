@@ -80,5 +80,9 @@ export function getAvailableFunctionNames(): string[] {
     // Utility functions
     'checkRecipeIngredients',
     'getInventorySummary',
+    // Appliance functions
+    'getUserAppliances',
+    'searchAppliances',
+    'hasAppliance',
   ];
 }

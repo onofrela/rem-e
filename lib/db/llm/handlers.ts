@@ -9,6 +9,8 @@ import * as ingredientService from '../services/ingredientService';
 import * as recipeService from '../services/recipeService';
 import * as inventoryService from '../services/inventoryService';
 import * as compatibilityService from '../services/compatibilityService';
+import * as applianceService from '../services/applianceService';
+import * as userApplianceService from '../services/userApplianceService';
 import type {
   SearchIngredientsParams,
   GetInventoryParams,
@@ -18,7 +20,8 @@ import type {
   CalculatePortionsParams,
   StorageLocation,
   RecipeDifficulty,
-  RecipeCategory
+  RecipeCategory,
+  SearchAppliancesParams
 } from '../schemas/types';
 
 // =============================================================================
@@ -767,6 +770,129 @@ async function handleGetInventorySummary(): Promise<FunctionResult> {
 }
 
 // =============================================================================
+// APPLIANCE HANDLERS
+// =============================================================================
+
+async function handleGetUserAppliances(): Promise<FunctionResult> {
+  try {
+    const userAppliances = await userApplianceService.getAllUserAppliances();
+
+    // Enrich with appliance details from catalog
+    const enriched = await Promise.all(
+      userAppliances.map(async (userApp) => {
+        const appliance = await applianceService.getApplianceById(userApp.applianceId);
+        return {
+          id: userApp.id,
+          applianceId: userApp.applianceId,
+          name: appliance?.name || 'Desconocido',
+          category: appliance?.category,
+          description: appliance?.description,
+        };
+      })
+    );
+
+    if (enriched.length === 0) {
+      return {
+        success: true,
+        data: {
+          appliances: [],
+          message: "No tienes electrodomésticos registrados en Mi Cocina.",
+          totalAppliances: 0
+        }
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        appliances: enriched,
+        totalAppliances: enriched.length,
+        message: `Tienes ${enriched.length} electrodoméstico(s) registrado(s).`
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error obteniendo electrodomésticos del usuario',
+    };
+  }
+}
+
+async function handleSearchAppliances(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const params: SearchAppliancesParams = {
+      query: args.query as string,
+      category: args.category as SearchAppliancesParams['category'],
+      limit: args.limit as number,
+    };
+
+    const results = await applianceService.searchAppliances(params);
+
+    return {
+      success: true,
+      data: results.map(app => ({
+        id: app.id,
+        name: app.name,
+        category: app.category,
+        description: app.description,
+        isCommon: app.isCommon,
+      })),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error buscando electrodomésticos',
+    };
+  }
+}
+
+async function handleHasAppliance(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const applianceName = (args.applianceName as string || '').toLowerCase().trim();
+
+    if (!applianceName) {
+      return {
+        success: false,
+        error: 'Debes especificar el nombre del electrodoméstico a buscar',
+      };
+    }
+
+    // Buscar el electrodoméstico en el catálogo
+    const catalogAppliance = await applianceService.findApplianceByName(applianceName);
+
+    if (!catalogAppliance) {
+      return {
+        success: true,
+        data: {
+          hasAppliance: false,
+          message: `No encontré "${applianceName}" en el catálogo de electrodomésticos.`,
+          applianceName: applianceName
+        }
+      };
+    }
+
+    // Verificar si el usuario lo tiene
+    const hasIt = await userApplianceService.hasAppliance(catalogAppliance.id);
+
+    return {
+      success: true,
+      data: {
+        hasAppliance: hasIt,
+        applianceName: catalogAppliance.name,
+        message: hasIt
+          ? `Sí, tienes ${catalogAppliance.name} en tu cocina.`
+          : `No, no tienes ${catalogAppliance.name} registrado en tu cocina.`
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error verificando electrodoméstico',
+    };
+  }
+}
+
+// =============================================================================
 // HANDLER REGISTRY
 // =============================================================================
 
@@ -802,6 +928,11 @@ const handlers: Record<string, FunctionHandler> = {
   // Utility handlers
   checkRecipeIngredients: handleCheckRecipeIngredients,
   getInventorySummary: handleGetInventorySummary,
+
+  // Appliance handlers
+  getUserAppliances: handleGetUserAppliances,
+  searchAppliances: handleSearchAppliances,
+  hasAppliance: handleHasAppliance,
 };
 
 /**

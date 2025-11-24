@@ -14,6 +14,7 @@ import {
   Settings,
   MapPin,
   Library,
+  ChefHat,
   LucideIcon
 } from 'lucide-react';
 
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { id: 'home', label: 'Inicio', icon: Home, href: '/' },
   { id: 'cook', label: 'Cocinar', icon: UtensilsCrossed, href: '/cook' },
   { id: 'inventory', label: 'Inventario', icon: Package, href: '/inventory' },
+  { id: 'mi-cocina', label: 'Mi Cocina', icon: ChefHat, href: '/mi-cocina' },
   { id: 'locations', label: 'Ubicaciones', icon: MapPin, href: '/locations' },
   { id: 'glossary', label: 'Glosario', icon: Library, href: '/glossary' },
   { id: 'recipes', label: 'Recetas', icon: BookOpen, href: '/recipes' },

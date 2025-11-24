@@ -12,7 +12,9 @@ import type {
   InventoryItem,
   CatalogIngredient,
   Recipe,
-  Location
+  Location,
+  CatalogAppliance,
+  UserAppliance
 } from '../schemas/types';
 
 // =============================================================================
@@ -20,7 +22,7 @@ import type {
 // =============================================================================
 
 const DB_NAME = 'RemEDatabase';
-const DB_VERSION = 3; // Increment when schema changes
+const DB_VERSION = 4; // Increment when schema changes
 
 // Store names
 export const STORES = {
@@ -29,6 +31,8 @@ export const STORES = {
   RECIPES_CACHE: 'recipesCache',
   USER_PREFERENCES: 'userPreferences',
   LOCATIONS: 'locations',
+  APPLIANCES_CACHE: 'appliancesCache',
+  USER_APPLIANCES: 'userAppliances',
 } as const;
 
 // =============================================================================
@@ -105,6 +109,21 @@ export function openDatabase(): Promise<IDBDatabase> {
         const locationsStore = db.createObjectStore(STORES.LOCATIONS, { keyPath: 'id' });
         locationsStore.createIndex('name', 'name', { unique: true });
         locationsStore.createIndex('order', 'order', { unique: false });
+      }
+
+      // Create Appliances Cache store
+      if (!db.objectStoreNames.contains(STORES.APPLIANCES_CACHE)) {
+        const appliancesStore = db.createObjectStore(STORES.APPLIANCES_CACHE, { keyPath: 'id' });
+        appliancesStore.createIndex('normalizedName', 'normalizedName', { unique: false });
+        appliancesStore.createIndex('category', 'category', { unique: false });
+        appliancesStore.createIndex('isCommon', 'isCommon', { unique: false });
+      }
+
+      // Create User Appliances store
+      if (!db.objectStoreNames.contains(STORES.USER_APPLIANCES)) {
+        const userAppliancesStore = db.createObjectStore(STORES.USER_APPLIANCES, { keyPath: 'id' });
+        userAppliancesStore.createIndex('applianceId', 'applianceId', { unique: false });
+        userAppliancesStore.createIndex('createdAt', 'createdAt', { unique: false });
       }
     };
   });
@@ -483,15 +502,33 @@ export async function getDatabaseStats(): Promise<{
   ingredientsCacheCount: number;
   recipesCacheCount: number;
   locationsCount: number;
+  appliancesCacheCount: number;
+  userAppliancesCount: number;
 }> {
-  const [inventoryCount, ingredientsCacheCount, recipesCacheCount, locationsCount] = await Promise.all([
+  const [
+    inventoryCount,
+    ingredientsCacheCount,
+    recipesCacheCount,
+    locationsCount,
+    appliancesCacheCount,
+    userAppliancesCount
+  ] = await Promise.all([
     countItems(STORES.INVENTORY),
     countItems(STORES.INGREDIENTS_CACHE),
     countItems(STORES.RECIPES_CACHE),
     countItems(STORES.LOCATIONS),
+    countItems(STORES.APPLIANCES_CACHE),
+    countItems(STORES.USER_APPLIANCES),
   ]);
 
-  return { inventoryCount, ingredientsCacheCount, recipesCacheCount, locationsCount };
+  return {
+    inventoryCount,
+    ingredientsCacheCount,
+    recipesCacheCount,
+    locationsCount,
+    appliancesCacheCount,
+    userAppliancesCount
+  };
 }
 
 // =============================================================================
@@ -513,3 +550,47 @@ export async function getLocationByName(name: string): Promise<Location | null> 
   const locations = await getByIndex<Location>(STORES.LOCATIONS, 'name', name);
   return locations.length > 0 ? locations[0] : null;
 }
+
+// =============================================================================
+// APPLIANCES CACHE OPERATIONS
+// =============================================================================
+
+/**
+ * Search appliances by name (fuzzy search in cache)
+ */
+export async function searchAppliancesByName(searchTerm: string): Promise<CatalogAppliance[]> {
+  const allAppliances = await getAllItems<CatalogAppliance>(STORES.APPLIANCES_CACHE);
+  const lowerSearch = searchTerm.toLowerCase();
+
+  return allAppliances.filter(app =>
+    app.name.toLowerCase().includes(lowerSearch) ||
+    app.normalizedName.toLowerCase().includes(lowerSearch) ||
+    app.synonyms.some(syn => syn.toLowerCase().includes(lowerSearch))
+  );
+}
+
+/**
+ * Get appliances by category
+ */
+export async function getAppliancesByCategory(category: string): Promise<CatalogAppliance[]> {
+  return getByIndex<CatalogAppliance>(STORES.APPLIANCES_CACHE, 'category', category);
+}
+
+/**
+ * Get common appliances
+ */
+export async function getCommonAppliances(): Promise<CatalogAppliance[]> {
+  return getByIndex<CatalogAppliance>(STORES.APPLIANCES_CACHE, 'isCommon', true);
+}
+
+// =============================================================================
+// USER APPLIANCES OPERATIONS
+// =============================================================================
+
+/**
+ * Get user appliances by appliance ID
+ */
+export async function getUserAppliancesByApplianceId(applianceId: string): Promise<UserAppliance[]> {
+  return getByIndex<UserAppliance>(STORES.USER_APPLIANCES, 'applianceId', applianceId);
+}
+

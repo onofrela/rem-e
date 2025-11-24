@@ -290,6 +290,56 @@ FUNCTION_DEFINITIONS = [
                 "required": ["ingredientId", "quantity", "unit", "location"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "getUserAppliances",
+            "description": "Obtiene todos los electrodomésticos, dispositivos, máquinas y herramientas de cocina que el usuario tiene registrados en 'Mi Cocina'. Devuelve una lista con los nombres de los electrodomésticos.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "searchAppliances",
+            "description": "Busca electrodomésticos, dispositivos, máquinas o herramientas de cocina en el catálogo por nombre o categoría",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Término de búsqueda (ej: microondas, horno, cafetera)"
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "Categoría de electrodoméstico (opcional)"
+                    }
+                },
+                "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "hasAppliance",
+            "description": "Verifica si el usuario tiene un electrodoméstico específico en su cocina",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "applianceName": {
+                        "type": "string",
+                        "description": "Nombre del electrodoméstico a buscar (ej: microondas, horno)"
+                    }
+                },
+                "required": ["applianceName"]
+            }
+        }
     }
 ]
 

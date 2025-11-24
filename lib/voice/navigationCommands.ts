@@ -26,6 +26,11 @@ export const routes: NavigationRoute[] = [
     keywords: ["inventario", "ingredientes", "despensa", "almacén", "almacen", "productos"],
   },
   {
+    path: "/mi-cocina",
+    name: "Mi Cocina",
+    keywords: ["mi cocina", "electrodomésticos", "electrodomesticos", "aparatos", "dispositivos", "equipos", "herramientas"],
+  },
+  {
     path: "/recipes",
     name: "Recetas",
     keywords: ["recetas", "receta", "comidas", "platos"],
