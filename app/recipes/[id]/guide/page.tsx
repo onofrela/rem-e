@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { api } from '@/lib/api/mock-api';
 import { Recipe } from '@/lib/utils/mock-data';
 import { useVoice, VoiceCommand } from '@/lib/hooks/useVoice';
-import { useGeminiTTS } from '@/lib/hooks/useGeminiTTS';
+import { usePollyTTS } from '@/lib/hooks/usePollyTTS';
 
 export default function CookingGuidePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -27,8 +27,8 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
     continuous: true,
   });
 
-  // Text-to-speech with Gemini TTS
-  const { speak, stop: stopSpeech, isLoading: isSpeechLoading, isPlaying: isSpeechPlaying, usingFallback } = useGeminiTTS();
+  // Text-to-speech with Amazon Polly TTS
+  const { speak, stop: stopSpeech, isLoading: isSpeechLoading, isPlaying: isSpeechPlaying, usingFallback } = usePollyTTS();
 
   useEffect(() => {
     loadRecipe();
@@ -168,7 +168,7 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
               Preparando audio...
             </p>
             <p className="text-sm text-[var(--color-text-secondary)]">
-              {usingFallback ? 'Usando voz sintética' : 'Generando voz natural con Gemini'}
+              {usingFallback ? 'Usando voz sintética' : 'Generando voz natural con Amazon Polly'}
             </p>
           </Card>
         </div>

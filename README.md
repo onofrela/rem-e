@@ -32,6 +32,7 @@
 #### 🍳 **Interactive Cooking Mode** (Modo Guía Interactiva)
 - Guía paso a paso inmersiva con pantalla completa
 - **Control por Voz** (Web Speech API)
+- **Text-to-Speech con Amazon Polly** - Voz natural de alta calidad
 - Sistema de timers múltiples
 - Tap anywhere para avanzar
 - Tips y advertencias contextuales
@@ -56,12 +57,26 @@
 # Instalar dependencias
 npm install
 
+# Configurar variables de entorno
+# Copia .env.example a .env.local y configura tus credenciales de AWS
+# Ver AWS_POLLY_SETUP.md para instrucciones detalladas
+
 # Iniciar servidor de desarrollo
 npm run dev
 
 # Abrir en navegador
 # http://localhost:3000
 ```
+
+### 🎙️ Configuración de Text-to-Speech (Opcional)
+
+Rem-E usa **Amazon Polly** para síntesis de voz de alta calidad en la guía de cocina. Para habilitar esta característica:
+
+1. Consulta la guía completa en [AWS_POLLY_SETUP.md](./AWS_POLLY_SETUP.md)
+2. Configura tus credenciales de AWS en `.env.local`
+3. Amazon Polly ofrece **5 millones de caracteres gratis por mes** durante los primeros 12 meses
+
+**Nota:** Si no configuras AWS Polly, la app automáticamente usará la síntesis de voz del navegador (Web Speech API) como fallback.
 
 ## 🗂 Estructura
 
@@ -121,7 +136,8 @@ api.getRecipe(id)                // → GET /api/recipes/:id
 - Next.js 16 + React 19 + TypeScript
 - Tailwind CSS 4
 - PWA con service worker
-- Web Speech API para voz
+- Web Speech API para reconocimiento de voz
+- Amazon Polly (AWS) para síntesis de voz natural
 - LocalStorage + IndexedDB
 
 ## 📱 Rutas Disponibles

@@ -2,13 +2,13 @@
 
 import { useState, useRef, useCallback } from 'react';
 
-interface UseGeminiTTSOptions {
+interface UsePollyTTSOptions {
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (error: string) => void;
 }
 
-interface UseGeminiTTSReturn {
+interface UsePollyTTSReturn {
   speak: (text: string) => Promise<void>;
   stop: () => void;
   isLoading: boolean;
@@ -17,7 +17,7 @@ interface UseGeminiTTSReturn {
   usingFallback: boolean;
 }
 
-export function useGeminiTTS(options: UseGeminiTTSOptions = {}): UseGeminiTTSReturn {
+export function usePollyTTS(options: UsePollyTTSOptions = {}): UsePollyTTSReturn {
   const { onStart, onEnd, onError } = options;
 
   const [isLoading, setIsLoading] = useState(false);
@@ -119,7 +119,7 @@ export function useGeminiTTS(options: UseGeminiTTSOptions = {}): UseGeminiTTSRet
         setIsPlaying(false);
         URL.revokeObjectURL(audioUrl);
         // Fallback to browser TTS
-        console.warn('Gemini TTS audio playback failed, using fallback');
+        console.warn('Amazon Polly TTS audio playback failed, using fallback');
         speakWithFallback(text);
       };
 
@@ -132,7 +132,7 @@ export function useGeminiTTS(options: UseGeminiTTSOptions = {}): UseGeminiTTSRet
       }
 
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      console.warn('Gemini TTS failed, using fallback:', errorMessage);
+      console.warn('Amazon Polly TTS failed, using fallback:', errorMessage);
 
       // Fallback to browser TTS
       speakWithFallback(text);
@@ -140,7 +140,7 @@ export function useGeminiTTS(options: UseGeminiTTSOptions = {}): UseGeminiTTSRet
   }, [onStart, onEnd, onError, speakWithFallback]);
 
   const stop = useCallback(() => {
-    // Stop Gemini TTS audio
+    // Stop Amazon Polly TTS audio
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
