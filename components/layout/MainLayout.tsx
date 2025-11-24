@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Navbar } from './Navbar';
+import { VoiceAssistant } from '@/components/voice';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -18,6 +19,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           {children}
         </main>
       </div>
+      {/* Voice Assistant Widget */}
+      <VoiceAssistant />
     </div>
   );
 };

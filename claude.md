@@ -4,6 +4,48 @@ This document serves as a comprehensive guide for understanding and working with
 
 ---
 
+## 🚨 CRITICAL: LLM Response Format Rules
+
+**⚠️ MANDATORY: When working with LLM prompts and responses in this project:**
+
+### JSON Response Rule
+- **NEVER return JSON to the user** - Users should ONLY receive natural language responses
+- LLMs should respond with plain text in Spanish, not JSON structures
+- JSON is ONLY for internal system communication, never for user-facing responses
+
+### Second Person Rule
+- **Always use second person (tú/tienes/puedes)** when addressing the user
+- **NEVER use first person (yo/tengo/necesito)** - the assistant should not speak as if it owns things
+- The assistant is helping the USER, not talking about itself
+
+**Examples:**
+
+✅ **CORRECT:**
+```
+User: "¿Cuántos tomates tengo?"
+Assistant: "Tienes 3 tomates en la alacena"
+```
+
+❌ **WRONG - JSON response:**
+```
+User: "¿Cuántos tomates tengo?"
+Assistant: {"action": "getInventory", "user_message": "Tengo 3 tomates"}
+```
+
+❌ **WRONG - First person:**
+```
+User: "¿Cuántos tomates tengo?"
+Assistant: "Tengo 3 tomates en la alacena"
+```
+
+### When Creating System Prompts:
+Always include these reminders in LLM system prompts:
+1. "Responde SOLO con texto natural en español, NUNCA con JSON"
+2. "Usa segunda persona (tú/tienes/puedes), NO primera persona (yo/tengo)"
+3. "Sé conciso y directo"
+
+---
+
 ## 🎨 Design Philosophy
 
 ### iPad-Inspired Modern Minimalist Design

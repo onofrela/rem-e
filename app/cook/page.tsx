@@ -7,9 +7,19 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
-import { api, DetectedIngredient } from '@/lib/api/mock-api';
+import { api } from '@/lib/api/mock-api';
+import { recognizeFoodFromFile, RecognitionResult } from '@/lib/vision';
 
 type InputMethod = 'photo' | 'manual' | 'suggestions';
+
+// Extended interface for detected ingredients with vision data
+interface DetectedIngredient {
+  name: string;
+  confidence: number;
+  category?: string;
+  description?: string;
+  estimatedWeight?: number;
+}
 
 export default function CookPage() {
   const router = useRouter();
@@ -21,22 +31,78 @@ export default function CookPage() {
   const [detectedIngredients, setDetectedIngredients] = useState<DetectedIngredient[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle photo capture
+  const [detectionError, setDetectionError] = useState<string | null>(null);
+  const [lastRecognitionResult, setLastRecognitionResult] = useState<RecognitionResult | null>(null);
+
+  // Handle photo capture with real AI detection
   const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsDetecting(true);
+    setDetectionError(null);
+    setDetectedIngredients([]);
+
     try {
-      const detected = await api.detectIngredients(file);
-      setDetectedIngredients(detected);
-      // Auto-add high confidence detections
-      const highConfidence = detected
-        .filter(d => d.confidence > 0.8)
-        .map(d => d.name);
-      setSelectedIngredients(prev => [...new Set([...prev, ...highConfidence])]);
+      // Use real AI vision detection via Qwen VL
+      const results = await recognizeFoodFromFile(file);
+
+      if (results.length > 0) {
+        const result = results[0];
+        setLastRecognitionResult(result);
+
+        // Convert recognition result to detected ingredients
+        const detected: DetectedIngredient[] = [];
+
+        // Add main ingredient detected
+        if (result.foodNameEs && result.foodNameEs !== 'Ingrediente') {
+          detected.push({
+            name: result.foodNameEs,
+            confidence: result.confidence / 100,
+            category: result.category,
+            description: result.description,
+            estimatedWeight: result.estimatedWeight?.weight,
+          });
+        }
+
+        // Add individual ingredients if detected (for dishes)
+        if (result.ingredients && result.ingredients.length > 0) {
+          result.ingredients.forEach(ing => {
+            detected.push({
+              name: ing,
+              confidence: 0.75, // Estimated confidence for sub-ingredients
+            });
+          });
+        }
+
+        setDetectedIngredients(detected);
+
+        // Auto-add high confidence detections
+        const highConfidence = detected
+          .filter(d => d.confidence > 0.7)
+          .map(d => d.name);
+        setSelectedIngredients(prev => [...new Set([...prev, ...highConfidence])]);
+      }
     } catch (error) {
       console.error('Error detecting ingredients:', error);
+      setDetectionError(
+        error instanceof Error
+          ? error.message
+          : 'Error al analizar la imagen. Asegúrate de que LM Studio esté corriendo.'
+      );
+
+      // Fallback to mock API if real detection fails
+      try {
+        const detected = await api.detectIngredients(file);
+        setDetectedIngredients(detected);
+        const highConfidence = detected
+          .filter(d => d.confidence > 0.8)
+          .map(d => d.name);
+        setSelectedIngredients(prev => [...new Set([...prev, ...highConfidence])]);
+        setDetectionError('Usando detección simulada (LM Studio no disponible)');
+      } catch {
+        // If both fail, show error
+      }
     } finally {
       setIsDetecting(false);
     }
@@ -176,17 +242,60 @@ export default function CookPage() {
 
               {isDetecting && (
                 <div className="mt-6 text-center">
-                  <div className="inline-block animate-spin text-4xl mb-2">⚙️</div>
+                  <div className="inline-block animate-spin text-4xl mb-2">🔍</div>
                   <p className="text-[var(--color-text-secondary)]">
-                    Analizando imagen con IA...
+                    Analizando imagen con IA (Qwen VL)...
                   </p>
+                  <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                    Esto puede tomar unos segundos
+                  </p>
+                </div>
+              )}
+
+              {detectionError && !isDetecting && (
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ {detectionError}
+                  </p>
+                </div>
+              )}
+
+              {lastRecognitionResult && !isDetecting && (
+                <div className="mt-6 p-4 bg-[var(--color-accent)] rounded-xl">
+                  <div className="flex items-start gap-4">
+                    <div className="text-4xl">🎯</div>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-lg text-[var(--color-text-primary)]">
+                        {lastRecognitionResult.foodNameEs}
+                      </h4>
+                      {lastRecognitionResult.category && (
+                        <Badge variant="info" size="sm" className="mt-1">
+                          {lastRecognitionResult.category}
+                        </Badge>
+                      )}
+                      {lastRecognitionResult.description && (
+                        <p className="text-sm text-[var(--color-text-secondary)] mt-2 line-clamp-2">
+                          {lastRecognitionResult.description}
+                        </p>
+                      )}
+                      <div className="flex gap-4 mt-2 text-xs text-[var(--color-text-secondary)]">
+                        <span>Confianza: {lastRecognitionResult.confidence}%</span>
+                        {lastRecognitionResult.estimatedWeight && (
+                          <span>~{lastRecognitionResult.estimatedWeight.weight}g</span>
+                        )}
+                        {lastRecognitionResult.estimatedCalories && (
+                          <span>{lastRecognitionResult.estimatedCalories}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
               {detectedIngredients.length > 0 && !isDetecting && (
                 <div className="mt-6">
                   <h4 className="font-semibold mb-3 text-[var(--color-text-primary)]">
-                    Ingredientes detectados:
+                    Ingredientes detectados ({detectedIngredients.length}):
                   </h4>
                   <div className="space-y-2">
                     {detectedIngredients.map((ing, idx) => (
@@ -194,11 +303,25 @@ export default function CookPage() {
                         key={idx}
                         className="flex items-center justify-between p-3 bg-[var(--color-surface)] rounded-lg"
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="text-xl">✓</span>
-                          <span className="font-medium">{ing.name}</span>
+                        <div className="flex items-center gap-3 flex-1">
+                          <span className="text-xl">
+                            {selectedIngredients.includes(ing.name) ? '✓' : '○'}
+                          </span>
+                          <div className="flex-1">
+                            <span className="font-medium">{ing.name}</span>
+                            {ing.category && (
+                              <span className="text-xs text-[var(--color-text-secondary)] ml-2">
+                                ({ing.category})
+                              </span>
+                            )}
+                            {ing.estimatedWeight && (
+                              <span className="text-xs text-[var(--color-text-secondary)] ml-2">
+                                ~{ing.estimatedWeight}g
+                              </span>
+                            )}
+                          </div>
                           <Badge
-                            variant={ing.confidence > 0.9 ? 'success' : 'warning'}
+                            variant={ing.confidence > 0.85 ? 'success' : ing.confidence > 0.7 ? 'warning' : 'default'}
                             size="sm"
                           >
                             {Math.round(ing.confidence * 100)}%
@@ -212,7 +335,7 @@ export default function CookPage() {
                               addIngredient(ing.name);
                             }
                           }}
-                          className="text-sm text-[var(--color-primary)] hover:underline"
+                          className="text-sm text-[var(--color-primary)] hover:underline ml-3 min-w-[70px] text-right"
                         >
                           {selectedIngredients.includes(ing.name) ? 'Remover' : 'Agregar'}
                         </button>

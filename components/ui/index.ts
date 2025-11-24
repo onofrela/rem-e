@@ -15,3 +15,5 @@ export { Logo } from './Logo';
 export { RecipeCard } from './RecipeCard';
 
 export { RecipeCarousel } from './RecipeCarousel';
+
+export { FullScreenOverlay } from './FullScreenOverlay';
