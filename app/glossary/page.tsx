@@ -1,20 +1,17 @@
 'use client';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { MainLayout } from '@/components/layout';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import type { CatalogIngredient, IngredientCategory } from '@/lib/db/schemas/types';
 import {
   getAllIngredients,
   getCategories,
-  exportIngredientsClean,
-  importIngredientsFromJSON,
   initializeIngredientsCache,
 } from '@/lib/db/services/ingredientService';
 
 export default function GlossaryPage() {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [ingredients, setIngredients] = useState<CatalogIngredient[]>([]);
   const [categories, setCategories] = useState<IngredientCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +19,6 @@ export default function GlossaryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedIngredient, setSelectedIngredient] = useState<CatalogIngredient | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -68,48 +64,6 @@ export default function GlossaryPage() {
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }, [ingredients, selectedCategory, searchQuery]);
 
-  const handleExport = async () => {
-    try {
-      const jsonData = await exportIngredientsClean();
-      const blob = new Blob([jsonData], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `rem-e-ingredientes-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setSuccessMessage('Glosario exportado correctamente');
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (err) {
-      setError('Error al exportar el glosario');
-    }
-  };
-
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const result = await importIngredientsFromJSON(text);
-
-      if (result.errors.length > 0) {
-        setError(`Importación completada con errores: ${result.errors.join(', ')}`);
-      } else {
-        setSuccessMessage(`Se importaron ${result.success} ingredientes correctamente`);
-        setTimeout(() => setSuccessMessage(null), 3000);
-      }
-
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al importar el archivo');
-    }
-
-    event.target.value = '';
-  };
-
   const categoryIcons: Record<string, string> = {
     'Proteínas': '🥩',
     'Lácteos': '🧀',
@@ -140,7 +94,7 @@ export default function GlossaryPage() {
 
         <div className="container mx-auto max-w-6xl px-4 md:px-6 -mt-4 space-y-6">
           {error && (
-            <Card variant="outlined" padding="md" className="border-red-300 bg-red-50">
+            <Card variant="outlined" padding="md" className="border-red-300 bg-red-50 animate-fadeInDown">
               <div className="flex justify-between items-center">
                 <p className="text-red-600 text-sm">{error}</p>
                 <button onClick={() => setError(null)} className="text-red-600">
@@ -150,42 +104,17 @@ export default function GlossaryPage() {
             </Card>
           )}
 
-          {successMessage && (
-            <Card variant="outlined" padding="md" className="border-green-300 bg-green-50">
-              <p className="text-green-600 text-sm">{successMessage}</p>
-            </Card>
-          )}
-
-          {/* Import/Export Section */}
-          <Card variant="elevated" padding="lg" className="animate-fadeInUp">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          {/* Info Card */}
+          <Card variant="outlined" padding="md" className="animate-fadeInUp">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">ℹ️</span>
               <div>
-                <h2 className="text-lg font-semibold mb-1">Importar / Exportar</h2>
                 <p className="text-sm text-[var(--color-text-secondary)]">
-                  Gestiona el catálogo de ingredientes de Rem-E
+                  Para importar o exportar el glosario completo, ve a la sección{' '}
+                  <Link href="/settings" className="text-[var(--color-primary)] font-semibold underline">
+                    Ajustes
+                  </Link>
                 </p>
-              </div>
-              <div className="flex gap-2 w-full sm:w-auto">
-                <Button variant="primary" size="md" onClick={handleExport}>
-                  Exportar JSON
-                </Button>
-                <div>
-                  <Button 
-                    variant="ghost" 
-                    size="md" 
-                    onClick={() => fileInputRef.current?.click()} // Disparador manual
-                  >
-                    Importar JSON
-                  </Button>
-                  
-                  <input
-                    ref={fileInputRef} // Conectamos la referencia
-                    type="file"
-                    accept=".json"
-                    onChange={handleImport}
-                    className="hidden" // Sigue oculto, pero funcional
-                  />
-                </div>
               </div>
             </div>
           </Card>

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { Recipe, RecipeStep } from '@/lib/db/schemas/types';
 
 /**
  * RecipeGuideContext - Context para compartir estado de guía de receta
@@ -16,8 +15,8 @@ interface RecipeGuideState {
   currentStep: number | null;
   sessionId: string | null;
   activeVariantId: string | null;
-  recipe: Recipe | null;
-  currentStepData: RecipeStep | null;
+  recipe: any; // Acepta cualquier tipo de receta (mock-data o db schema)
+  currentStepData: any; // Acepta cualquier tipo de paso
 }
 
 interface RecipeGuideContextValue extends RecipeGuideState {
@@ -48,8 +47,8 @@ export function RecipeGuideProvider({ children }: RecipeGuideProviderProps) {
       const updated = { ...prev, ...newState };
 
       // Auto-calcular currentStepData cuando cambia currentStep o recipe
-      if (updated.recipe && updated.currentStep) {
-        updated.currentStepData = updated.recipe.steps.find(s => s.step === updated.currentStep) || null;
+      if (updated.recipe && updated.currentStep && updated.recipe.steps) {
+        updated.currentStepData = updated.recipe.steps.find((s: any) => s.step === updated.currentStep) || null;
       }
 
       return updated;

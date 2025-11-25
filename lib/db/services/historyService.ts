@@ -94,7 +94,7 @@ export async function getCompletedHistory(): Promise<RecipeHistory[]> {
   const histories = await getByIndex<RecipeHistory>(
     STORES.RECIPE_HISTORY,
     'completed',
-    true
+    1 // Use 1 instead of true for IndexedDB
   );
 
   return histories.sort((a, b) =>

@@ -313,7 +313,7 @@ export default function InventoryPage() {
                 {categories.map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => setFilterCategory(cat)}
+                    onClick={() => setFilterCategory(cat || 'all')}
                     className={`
                       px-3 py-1.5 rounded-full text-sm font-medium transition-all
                       ${
@@ -323,7 +323,7 @@ export default function InventoryPage() {
                       }
                     `}
                   >
-                    {cat === 'all' ? 'Todas' : `${getCategoryIcon(cat)} ${cat}`}
+                    {cat === 'all' ? 'Todas' : `${getCategoryIcon(cat || '')} ${cat}`}
                   </button>
                 ))}
               </div>

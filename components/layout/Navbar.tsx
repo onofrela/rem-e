@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Logo } from '@/components/ui/Logo';
 import {
   Home,
@@ -111,11 +110,6 @@ export const Navbar: React.FC = () => {
           <span className="text-xl font-bold text-[var(--color-primary)]">
             Rem-E
           </span>
-        </div>
-
-        {/* Theme Toggle - positioned on the right */}
-        <div className="ml-auto">
-          <ThemeToggle />
         </div>
       </div>
 

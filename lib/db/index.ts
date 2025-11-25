@@ -30,7 +30,7 @@ export * from './llm';
 // DATABASE STORES
 // =============================================================================
 
-export * from './stores';
+// export * from './stores/database'; // Comentado para evitar conflictos de exports
 
 // =============================================================================
 // LEGACY EXPORTS (for backward compatibility)

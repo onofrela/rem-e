@@ -56,7 +56,7 @@ async function loadIngredientsFromJSON(): Promise<CatalogIngredient[]> {
     // Fallback: try to import directly (for development)
     try {
       const module = await import('../data/ingredients.json');
-      ingredientsData = module.ingredients;
+      ingredientsData = module.ingredients as CatalogIngredient[];
       return ingredientsData!;
     } catch {
       return [];
@@ -188,11 +188,12 @@ export async function searchIngredients(
  */
 export async function fuzzySearchIngredients(query: string): Promise<CatalogIngredient[]> {
   const all = await getAllIngredients();
-  const similarNames = findSimilarIngredients(query, all.map(i => i.normalizedName));
+  const lowerQuery = query.toLowerCase();
 
   return all.filter(ing =>
-    similarNames.includes(ing.normalizedName) ||
-    ing.synonyms.some(syn => similarNames.includes(syn.toLowerCase()))
+    ing.normalizedName.includes(lowerQuery) ||
+    ing.name.toLowerCase().includes(lowerQuery) ||
+    ing.synonyms.some(syn => syn.toLowerCase().includes(lowerQuery))
   );
 }
 

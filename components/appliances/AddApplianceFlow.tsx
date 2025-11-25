@@ -73,7 +73,7 @@ export function AddApplianceFlow({
   };
 
   return (
-    <FullScreenOverlay isOpen={isOpen} onClose={handleClose}>
+    <FullScreenOverlay isOpen={isOpen} onClose={handleClose} title="Agregar Electrodoméstico">
       <div className="min-h-screen flex flex-col p-4 md:p-6 lg:p-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

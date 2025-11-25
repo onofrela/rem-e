@@ -61,7 +61,7 @@ async function loadRecipesFromJSON(): Promise<Recipe[]> {
     // Fallback: try to import directly (for development)
     try {
       const module = await import('../data/recipes.json');
-      recipesData = module.recipes as Recipe[];
+      recipesData = module.recipes as any;
       return recipesData!;
     } catch {
       return [];
@@ -467,20 +467,74 @@ export async function getRecipeDetails(recipeId: string): Promise<{
 }
 
 // =============================================================================
-// EXPORT
+// IMPORT/EXPORT
 // =============================================================================
 
 /**
- * Export all recipes to JSON string
+ * Export all recipes to JSON string (clean format for backup/transfer)
  */
-export async function exportRecipesToJSON(): Promise<string> {
+export async function exportRecipesClean(): Promise<string> {
   const recipes = await getAllRecipes();
   return JSON.stringify({
     metadata: {
       version: '1.0.0',
-      lastUpdated: new Date().toISOString(),
-      itemCount: recipes.length,
+      exportDate: new Date().toISOString(),
+      recipeCount: recipes.length,
+      description: 'Rem-E Recipes Export'
     },
     recipes,
   }, null, 2);
+}
+
+/**
+ * Import recipes from JSON string
+ * Validates format and adds to database
+ */
+export async function importRecipesFromJSON(jsonString: string): Promise<{
+  success: number;
+  errors: string[];
+}> {
+  try {
+    const data = JSON.parse(jsonString);
+
+    // Validate structure
+    if (!data.recipes || !Array.isArray(data.recipes)) {
+      throw new Error('Formato JSON inválido: debe contener un array "recipes"');
+    }
+
+    const errors: string[] = [];
+    const validRecipes: Recipe[] = [];
+
+    // Validate each recipe
+    for (const recipe of data.recipes) {
+      try {
+        // Basic validation
+        if (!recipe.id || !recipe.name || !recipe.ingredients || !recipe.steps) {
+          errors.push(`Receta inválida: ${recipe.name || 'sin nombre'} - faltan campos requeridos`);
+          continue;
+        }
+
+        validRecipes.push(recipe);
+      } catch (err) {
+        errors.push(`Error en receta ${recipe.name}: ${err instanceof Error ? err.message : 'error desconocido'}`);
+      }
+    }
+
+    // Clear existing recipes and add new ones
+    if (validRecipes.length > 0) {
+      await clearStore(STORES.RECIPES_CACHE);
+      await bulkAdd(STORES.RECIPES_CACHE, validRecipes);
+      recipesData = null; // Clear in-memory cache
+    }
+
+    return {
+      success: validRecipes.length,
+      errors,
+    };
+  } catch (error) {
+    return {
+      success: 0,
+      errors: [error instanceof Error ? error.message : 'Error al procesar el archivo JSON'],
+    };
+  }
 }

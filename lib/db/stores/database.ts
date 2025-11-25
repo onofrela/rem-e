@@ -440,7 +440,7 @@ export async function getIngredientsByCategory(category: string): Promise<Catalo
  * Get common ingredients
  */
 export async function getCommonIngredients(): Promise<CatalogIngredient[]> {
-  return getByIndex<CatalogIngredient>(STORES.INGREDIENTS_CACHE, 'isCommon', true);
+  return getByIndex<CatalogIngredient>(STORES.INGREDIENTS_CACHE, 'isCommon', 1);
 }
 
 // =============================================================================
@@ -660,7 +660,7 @@ export async function getAppliancesByCategory(category: string): Promise<Catalog
  * Get common appliances
  */
 export async function getCommonAppliances(): Promise<CatalogAppliance[]> {
-  return getByIndex<CatalogAppliance>(STORES.APPLIANCES_CACHE, 'isCommon', true);
+  return getByIndex<CatalogAppliance>(STORES.APPLIANCES_CACHE, 'isCommon', 1);
 }
 
 // =============================================================================

@@ -212,17 +212,18 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
             }
             break;
 
-          case "cooking_command":
-            // Comando de cocina (siguiente, anterior, repetir, etc.)
-            console.log("[Voice] Comando de cocina recibido:", data.command);
-            // Emitir evento personalizado para que la página de guide lo maneje
-            window.dispatchEvent(new CustomEvent('cooking-command', {
-              detail: {
-                command: data.command,
-                originalText: data.original_text
-              }
-            }));
-            setStatus("listening");
+          default:
+            // Check if it's a cooking command
+            if ((data as any).type === "cooking_command") {
+              console.log("[Voice] Comando de cocina recibido:", (data as any).command);
+              window.dispatchEvent(new CustomEvent('cooking-command', {
+                detail: {
+                  command: (data as any).command,
+                  originalText: (data as any).original_text
+                }
+              }));
+              setStatus("listening");
+            }
             break;
 
           case "thinking":

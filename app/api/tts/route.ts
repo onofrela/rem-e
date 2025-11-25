@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     // Convert the audio stream to a buffer
     const audioBuffer = await streamToBuffer(response.AudioStream);
 
-    return new NextResponse(audioBuffer, {
+    return new NextResponse(Buffer.from(audioBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'audio/mpeg',

@@ -1331,8 +1331,7 @@ async function handleExplainCookingStep(args: Record<string, unknown>): Promise<
 
     // Buscar conocimiento relacionado en la base de conocimiento del usuario
     const knowledge = await knowledgeService.getRelevantKnowledge({
-      recipeTypes: [recipe.category],
-      query: question,
+      recipeType: recipe.category,
     });
 
     return {
@@ -1404,23 +1403,32 @@ async function handleSubstituteIngredientInCooking(args: Record<string, unknown>
       description: `Variante con ${substituteIng.name} en lugar de ${originalIng.name}`,
       modifications: {
         ingredients: {
-          changed: [{
-            ingredientId: originalIngredientId,
-            newIngredientId: substituteIngredientId,
-            newAmount,
-            newUnit: recipeIngredient.unit,
-            reason: reason || 'Sustitución durante cocción',
+          removed: [originalIngredientId],
+          added: [{
+            ingredientId: substituteIngredientId,
+            displayName: substituteIng.name,
+            amount: newAmount,
+            unit: recipeIngredient.unit,
+            preparation: recipeIngredient.preparation,
+            optional: recipeIngredient.optional,
           }],
+          modified: [],
         },
         steps: substitution.requiresAdjustments?.steps ? {
+          removed: [],
+          added: [],
           modified: substitution.requiresAdjustments.steps.map(adj => ({
-            stepNumber: adj.stepNumber,
-            changes: { instruction: adj.suggestion },
+            stepNumber: adj.stepNumber || 1,
+            newInstruction: adj.suggestion,
+            reason: 'Ajuste por sustitución de ingrediente',
           })),
-        } : undefined,
+        } : {
+          removed: [],
+          added: [],
+          modified: [],
+        },
       },
       tags: ['sustitucion-automatica'],
-      createdBy: 'user',
     };
 
     const variant = await variantService.createVariant(variantParams);
@@ -1430,7 +1438,7 @@ async function handleSubstituteIngredientInCooking(args: Record<string, unknown>
       historyId: sessionId,
       stepNumber: undefined,
       content: `Sustitución: ${originalIng.name} → ${substituteIng.name} (ratio ${substitution.ratio})`,
-      type: 'substitution',
+      type: 'modification',
     };
 
     await historyService.addNoteToSession(noteParams);
@@ -1497,12 +1505,12 @@ async function handleGetCurrentStepDetails(args: Record<string, unknown>): Promi
     const recipeId = args.recipeId as string;
     const stepNumber = args.stepNumber as number;
 
-    const recipe = await recipeService.getRecipeDetails(recipeId);
-    if (!recipe) {
+    const recipeDetails = await recipeService.getRecipeDetails(recipeId);
+    if (!recipeDetails) {
       return { success: false, error: 'Receta no encontrada' };
     }
 
-    const step = recipe.steps.find(s => s.step === stepNumber);
+    const step = recipeDetails.recipe.steps.find(s => s.step === stepNumber);
     if (!step) {
       return { success: false, error: 'Paso no encontrado' };
     }
@@ -1510,7 +1518,7 @@ async function handleGetCurrentStepDetails(args: Record<string, unknown>): Promi
     // Resolver ingredientes usados en este paso
     const ingredientsInStep = await Promise.all(
       step.ingredientsUsed.map(async (ingId) => {
-        const recipeIng = recipe.ingredients.find(i => i.ingredientId === ingId);
+        const recipeIng = recipeDetails.recipe.ingredients.find(i => i.ingredientId === ingId);
         const catalogIng = await ingredientService.getIngredientById(ingId);
 
         return {
@@ -1628,7 +1636,7 @@ export async function executeFunction(
     };
   }
 
-  return handler(args);
+  return handler(args) as Promise<FunctionResult>;
 }
 
 /**

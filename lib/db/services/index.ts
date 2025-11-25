@@ -47,7 +47,8 @@ export {
   calculateRecipeNutrition,
   getRecipeTimeBreakdown,
   getRecipeDetails,
-  exportRecipesToJSON,
+  exportRecipesClean,
+  importRecipesFromJSON,
 } from './recipeService';
 
 // Inventory Service
