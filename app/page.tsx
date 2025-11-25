@@ -7,6 +7,20 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { mockRecipes } from '@/lib/utils/mock-data';
+import { RemIcon } from '@/lib/icons/iconMap';
+import {
+  UtensilsCrossed,
+  ArrowRight,
+  Lightbulb,
+  Clock,
+  ChefHat,
+  Utensils,
+  MessageCircle,
+  Package,
+  BookOpen,
+  Calendar,
+  GraduationCap,
+} from 'lucide-react';
 
 export default function Home() {
   const currentHour = new Date().getHours();
@@ -47,14 +61,16 @@ export default function Home() {
                   <div className="text-left md:text-left flex-1">
                     <p className="text-sm md:text-xl lg:text-2xl opacity-95 mb-3 md:mb-4 font-medium">Acción rápida</p>
                     <h3 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-3 md:mb-4 flex items-center gap-3 md:gap-4 drop-shadow-lg">
-                      <span className="text-5xl md:text-7xl lg:text-8xl">🍽</span>
+                      <RemIcon icon={UtensilsCrossed} size="hero" style="filled" className="text-white" />
                       <span>Cocinar Ahora</span>
                     </h3>
                     <p className="text-sm md:text-xl lg:text-2xl opacity-95 font-medium">
                       Descubre recetas con lo que tienes
                     </p>
                   </div>
-                  <div className="text-4xl md:text-7xl lg:text-8xl mt-4 md:mt-0 md:ml-4 opacity-90">→</div>
+                  <div className="mt-4 md:mt-0 md:ml-4 opacity-90">
+                    <RemIcon icon={ArrowRight} size="hero" style="filled" className="text-white" />
+                  </div>
                 </div>
               </Card>
             </Link>
@@ -66,7 +82,7 @@ export default function Home() {
                 <div className="p-4 md:p-6 flex flex-col justify-between flex-1">
                   <div>
                     <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
-                      <span className="text-2xl md:text-3xl lg:text-4xl">💡</span>
+                      <RemIcon icon={Lightbulb} size="lg" style="filled" className="text-[var(--color-primary)]" />
                       <span className="text-sm md:text-base lg:text-lg font-semibold text-gray-600">
                         Sugerencia del día
                       </span>
@@ -81,20 +97,23 @@ export default function Home() {
 
                   <div className="flex flex-wrap gap-2 md:gap-3">
                     <Badge variant="default" className="text-xs md:text-sm lg:text-base">
-                      ⏱ {suggestionOfTheDay.time}m
+                      <RemIcon icon={Clock} size="sm" style="outlined" className="inline mr-1" />
+                      {suggestionOfTheDay.time}m
                     </Badge>
                     <Badge variant="success" className="text-xs md:text-sm lg:text-base">
-                      👨‍🍳 {suggestionOfTheDay.difficulty}
+                      <RemIcon icon={ChefHat} size="sm" style="outlined" className="inline mr-1" />
+                      {suggestionOfTheDay.difficulty}
                     </Badge>
                     <Badge variant="info" className="text-xs md:text-sm lg:text-base">
-                      🍴 {suggestionOfTheDay.servings}
+                      <RemIcon icon={Utensils} size="sm" style="outlined" className="inline mr-1" />
+                      {suggestionOfTheDay.servings}
                     </Badge>
                   </div>
                 </div>
 
                 {/* Recipe Image */}
-                <div className="w-32 md:w-48 lg:w-56 flex items-center justify-center text-white text-5xl md:text-7xl lg:text-8xl flex-shrink-0 border-l border-white/20 home-suggestion-image">
-                  🍽
+                <div className="w-32 md:w-48 lg:w-56 flex items-center justify-center text-white flex-shrink-0 border-l border-white/20 home-suggestion-image">
+                  <RemIcon icon={UtensilsCrossed} size="hero" style="filled" className="text-white" />
                 </div>
               </Card>
             </Link>
@@ -103,7 +122,7 @@ export default function Home() {
             <div className="col-span-2 row-span-1">
               <Card variant="outlined" padding="lg" className="h-full animate-fadeIn flex items-center">
                 <div className="flex items-center gap-4 md:gap-6 w-full">
-                  <span className="text-4xl md:text-5xl lg:text-6xl flex-shrink-0">💭</span>
+                  <RemIcon icon={MessageCircle} size="xl" style="filled" className="text-[var(--color-primary)] flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm md:text-lg lg:text-xl font-semibold text-gray-800 mb-2 md:mb-3">
                       Consejo de hoy
@@ -120,7 +139,7 @@ export default function Home() {
             {/* Inventory - 1x1 tile */}
             <Link href="/inventory" className="col-span-1 row-span-1">
               <Card variant="elevated" padding="lg" hoverable className="h-full animate-fadeInUp stagger-1 flex flex-col justify-center items-center text-center gap-2 md:gap-3">
-                <span className="text-5xl md:text-6xl lg:text-7xl">🥫</span>
+                <RemIcon icon={Package} size="xl" style="filled" className="text-[var(--color-primary)]" />
                 <div>
                   <h3 className="text-base md:text-xl lg:text-2xl font-semibold text-gray-800">
                     Inventario
@@ -135,7 +154,7 @@ export default function Home() {
             {/* My Recipes - 1x1 tile */}
             <Link href="/recipes" className="col-span-1 row-span-1">
               <Card variant="elevated" padding="lg" hoverable className="h-full animate-fadeInUp stagger-2 flex flex-col justify-center items-center text-center gap-2 md:gap-3">
-                <span className="text-5xl md:text-6xl lg:text-7xl">📖</span>
+                <RemIcon icon={BookOpen} size="xl" style="filled" className="text-[var(--color-primary)]" />
                 <div>
                   <h3 className="text-base md:text-xl lg:text-2xl font-semibold text-gray-800">
                     Mis Recetas
@@ -150,7 +169,7 @@ export default function Home() {
             {/* Plan - 1x1 tile */}
             <Link href="/plan" className="col-span-1 row-span-1">
               <Card variant="elevated" padding="lg" hoverable className="h-full animate-fadeInUp stagger-3 flex flex-col justify-center items-center text-center gap-2 md:gap-3">
-                <span className="text-5xl md:text-6xl lg:text-7xl">📅</span>
+                <RemIcon icon={Calendar} size="xl" style="filled" className="text-[var(--color-primary)]" />
                 <div>
                   <h3 className="text-base md:text-xl lg:text-2xl font-semibold text-gray-800">
                     Planificar
@@ -165,7 +184,7 @@ export default function Home() {
             {/* Learn - 1x1 tile */}
             <Link href="/learn" className="col-span-1 row-span-1">
               <Card variant="elevated" padding="lg" hoverable className="h-full animate-fadeInUp stagger-4 flex flex-col justify-center items-center text-center gap-2 md:gap-3">
-                <span className="text-5xl md:text-6xl lg:text-7xl">🎓</span>
+                <RemIcon icon={GraduationCap} size="xl" style="filled" className="text-[var(--color-primary)]" />
                 <div>
                   <h3 className="text-base md:text-xl lg:text-2xl font-semibold text-gray-800">
                     Aprender

@@ -9,6 +9,20 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { api } from '@/lib/api/mock-api';
 import { recognizeFoodFromFile, RecognitionResult } from '@/lib/vision';
+import { RemIcon } from '@/lib/icons/iconMap';
+import {
+  UtensilsCrossed,
+  Camera,
+  Edit3,
+  Lightbulb,
+  Loader2,
+  AlertTriangle,
+  Target,
+  Check,
+  Circle,
+  Search,
+  X,
+} from 'lucide-react';
 
 type InputMethod = 'photo' | 'manual' | 'suggestions';
 
@@ -161,7 +175,10 @@ export default function CookPage() {
             >
               ← Volver
             </button>
-            <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-[var(--color-text-primary)] animate-fadeInDown">🍽 Cocinar Ahora</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-[var(--color-text-primary)] animate-fadeInDown flex items-center gap-2">
+              <RemIcon icon={UtensilsCrossed} size="lg" style="filled" className="text-[var(--color-primary)]" />
+              Cocinar Ahora
+            </h1>
             <p className="text-sm sm:text-base text-[var(--color-text-secondary)]">
               Dime qué ingredientes tienes y te sugeriré recetas deliciosas
             </p>
@@ -182,7 +199,8 @@ export default function CookPage() {
                   }
                 `}
               >
-                📷 Foto
+                <RemIcon icon={Camera} size="sm" style="outlined" className="inline mr-1" />
+                Foto
               </button>
               <button
                 onClick={() => setActiveMethod('manual')}
@@ -194,7 +212,8 @@ export default function CookPage() {
                   }
                 `}
               >
-                ✍️ Escribir
+                <RemIcon icon={Edit3} size="sm" style="outlined" className="inline mr-1" />
+                Escribir
               </button>
               <button
                 onClick={() => setActiveMethod('suggestions')}
@@ -206,7 +225,8 @@ export default function CookPage() {
                   }
                 `}
               >
-                💡 Sugerencias
+                <RemIcon icon={Lightbulb} size="sm" style="outlined" className="inline mr-1" />
+                Sugerencias
               </button>
             </div>
           </Card>
@@ -237,12 +257,24 @@ export default function CookPage() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isDetecting}
               >
-                {isDetecting ? '🔍 Detectando ingredientes...' : '📸 Abrir Cámara'}
+                {isDetecting ? (
+                  <>
+                    <RemIcon icon={Loader2} size="sm" className="inline mr-1 animate-spin" />
+                    Detectando ingredientes...
+                  </>
+                ) : (
+                  <>
+                    <RemIcon icon={Camera} size="sm" style="outlined" className="inline mr-1" />
+                    Abrir Cámara
+                  </>
+                )}
               </Button>
 
               {isDetecting && (
                 <div className="mt-6 text-center">
-                  <div className="inline-block animate-spin text-4xl mb-2">🔍</div>
+                  <div className="inline-block mb-2">
+                    <RemIcon icon={Loader2} size="hero" className="animate-spin text-[var(--color-primary)]" />
+                  </div>
                   <p className="text-[var(--color-text-secondary)]">
                     Analizando imagen con IA (Qwen VL)...
                   </p>
@@ -253,9 +285,10 @@ export default function CookPage() {
               )}
 
               {detectionError && !isDetecting && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+                  <RemIcon icon={AlertTriangle} size="sm" className="text-yellow-600 flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-yellow-800">
-                    ⚠️ {detectionError}
+                    {detectionError}
                   </p>
                 </div>
               )}
@@ -263,7 +296,7 @@ export default function CookPage() {
               {lastRecognitionResult && !isDetecting && (
                 <div className="mt-6 p-4 bg-[var(--color-accent)] rounded-xl">
                   <div className="flex items-start gap-4">
-                    <div className="text-4xl">🎯</div>
+                    <RemIcon icon={Target} size="xl" style="filled" className="text-[var(--color-primary)] flex-shrink-0" />
                     <div className="flex-1">
                       <h4 className="font-bold text-lg text-[var(--color-text-primary)]">
                         {lastRecognitionResult.foodNameEs}
@@ -304,9 +337,12 @@ export default function CookPage() {
                         className="flex items-center justify-between p-3 bg-[var(--color-surface)] rounded-lg"
                       >
                         <div className="flex items-center gap-3 flex-1">
-                          <span className="text-xl">
-                            {selectedIngredients.includes(ing.name) ? '✓' : '○'}
-                          </span>
+                          <RemIcon
+                            icon={selectedIngredients.includes(ing.name) ? Check : Circle}
+                            size="sm"
+                            style={selectedIngredients.includes(ing.name) ? "filled" : "outlined"}
+                            className={selectedIngredients.includes(ing.name) ? "text-[var(--color-success)]" : "text-gray-400"}
+                          />
                           <div className="flex-1">
                             <span className="font-medium">{ing.name}</span>
                             {ing.category && (
@@ -359,7 +395,7 @@ export default function CookPage() {
                   placeholder="Buscar ingrediente..."
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
-                  leftIcon={<span>🔍</span>}
+                  leftIcon={<RemIcon icon={Search} size="sm" style="outlined" />}
                   fullWidth
                 />
 
@@ -400,7 +436,10 @@ export default function CookPage() {
                         }
                       `}
                     >
-                      {selectedIngredients.includes(ing) ? '✓ ' : ''}{ing}
+                      {selectedIngredients.includes(ing) && (
+                        <RemIcon icon={Check} size="xs" style="filled" className="inline mr-1" />
+                      )}
+                      {ing}
                     </button>
                   ))}
                 </div>
@@ -500,7 +539,7 @@ export default function CookPage() {
                     onClick={() => removeIngredient(ing)}
                   >
                     {ing}
-                    <span className="text-white/80">✕</span>
+                    <RemIcon icon={X} size="xs" className="text-white/80" />
                   </Badge>
                 ))}
               </div>

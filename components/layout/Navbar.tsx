@@ -6,15 +6,14 @@ import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Logo } from '@/components/ui/Logo';
 import {
-  Home,
-  UtensilsCrossed,
-  Package,
+  DoorOpen,
+  ChefHat,
+  Apple,
+  CookingPot,
+  Refrigerator,
   BookOpen,
   Calendar,
   Settings,
-  MapPin,
-  Library,
-  ChefHat,
   LucideIcon
 } from 'lucide-react';
 
@@ -26,12 +25,12 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { id: 'home', label: 'Inicio', icon: Home, href: '/' },
-  { id: 'cook', label: 'Cocinar', icon: UtensilsCrossed, href: '/cook' },
-  { id: 'inventory', label: 'Inventario', icon: Package, href: '/inventory' },
-  { id: 'mi-cocina', label: 'Mi Cocina', icon: ChefHat, href: '/mi-cocina' },
-  { id: 'locations', label: 'Ubicaciones', icon: MapPin, href: '/locations' },
-  { id: 'glossary', label: 'Glosario', icon: Library, href: '/glossary' },
+  { id: 'home', label: 'Inicio', icon: DoorOpen, href: '/' },
+  { id: 'cook', label: 'Cocinar', icon: ChefHat, href: '/cook' },
+  { id: 'inventory', label: 'Inventario', icon: Apple, href: '/inventory' },
+  { id: 'mi-cocina', label: 'Mi Cocina', icon: CookingPot, href: '/mi-cocina' },
+  { id: 'locations', label: 'Ubicaciones', icon: Refrigerator, href: '/locations' },
+  { id: 'glossary', label: 'Glosario', icon: BookOpen, href: '/glossary' },
   { id: 'recipes', label: 'Recetas', icon: BookOpen, href: '/recipes' },
   { id: 'plan', label: 'Planificar', icon: Calendar, href: '/plan' },
   { id: 'settings', label: 'Ajustes', icon: Settings, href: '/settings' },

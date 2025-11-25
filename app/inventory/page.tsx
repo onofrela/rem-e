@@ -8,6 +8,19 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { AddIngredientFlow } from '@/components/inventory/AddIngredientFlow';
 import type { InventoryItem, InventoryAlert, Location, CatalogIngredient } from '@/lib/db/schemas/types';
+import { RemIcon, getCategoryIcon as getIconForCategory, getStorageIcon } from '@/lib/icons/iconMap';
+import {
+  Plus,
+  X,
+  Package,
+  AlertTriangle,
+  TrendingDown,
+  MapPin,
+  AlertCircle,
+  Loader2,
+  ShoppingCart,
+  Search,
+} from 'lucide-react';
 import {
   getAllInventory,
   addToInventory,
@@ -165,26 +178,17 @@ export default function InventoryPage() {
     return expDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
   };
 
-  const getCategoryIcon = (category: string) => {
-    const icons: Record<string, string> = {
-      Proteínas: '🍗',
-      Lácteos: '🥛',
-      Vegetales: '🥕',
-      Frutas: '🍎',
-      Granos: '🌾',
-      Condimentos: '🧂',
-      Aceites: '🫒',
-      Harinas: '🌾',
-      Endulzantes: '🍯',
-      Bebidas: '🥤',
-      Otros: '📦',
-    };
-    return icons[category] || '📦';
+  // Render category icon component
+  const renderCategoryIcon = (category: string) => {
+    const IconComponent = getIconForCategory(category);
+    return <RemIcon icon={IconComponent} size="sm" style="filled" className="inline" />;
   };
 
-  const getLocationIcon = (locationName?: string) => {
+  // Render location icon component
+  const renderLocationIcon = (locationName?: string) => {
     const location = locations.find((l) => l.name === locationName);
-    return location?.icon || '📍';
+    const IconComponent = getStorageIcon(location?.name || '');
+    return <RemIcon icon={IconComponent} size="sm" style="filled" className="inline" />;
   };
 
   if (loading) {
@@ -192,7 +196,9 @@ export default function InventoryPage() {
       <MainLayout>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin text-5xl mb-4">🔄</div>
+            <div className="mb-4">
+              <RemIcon icon={Loader2} size="hero" className="animate-spin text-[var(--color-primary)]" />
+            </div>
             <p className="text-[var(--color-text-secondary)]">Cargando inventario...</p>
           </div>
         </div>
@@ -214,7 +220,7 @@ export default function InventoryPage() {
                 variant="primary"
                 size="lg"
                 onClick={() => setShowAddFlow(true)}
-                icon={<span>+</span>}
+                icon={<RemIcon icon={Plus} size="sm" />}
                 iconPosition="left"
               >
                 Agregar
@@ -231,7 +237,9 @@ export default function InventoryPage() {
             <Card variant="outlined" padding="md" className="mb-4 border-red-300 bg-red-50">
               <div className="flex justify-between items-center">
                 <p className="text-red-600 text-sm">{error}</p>
-                <button onClick={() => setError(null)} className="text-red-600">✕</button>
+                <button onClick={() => setError(null)} className="text-red-600">
+                  <RemIcon icon={X} size="sm" />
+                </button>
               </div>
             </Card>
           )}
@@ -239,7 +247,9 @@ export default function InventoryPage() {
           {/* Stats Grid - Tablet oriented */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
             <Card variant="elevated" padding="lg" className="text-center">
-              <span className="text-4xl md:text-5xl mb-2 block">📦</span>
+              <div className="mb-2">
+                <RemIcon icon={Package} size="xl" style="filled" className="text-[var(--color-primary)]" />
+              </div>
               <p className="text-2xl md:text-3xl font-bold text-[var(--color-primary)]">
                 {inventory.length}
               </p>
@@ -248,7 +258,9 @@ export default function InventoryPage() {
               </p>
             </Card>
             <Card variant="elevated" padding="lg" className="text-center">
-              <span className="text-4xl md:text-5xl mb-2 block">⚠️</span>
+              <div className="mb-2">
+                <RemIcon icon={AlertTriangle} size="xl" style="filled" className="text-red-500" />
+              </div>
               <p className="text-2xl md:text-3xl font-bold text-red-500">
                 {alerts.filter((a) => a.type === 'expired' || a.type === 'expiring_soon').length}
               </p>
@@ -257,7 +269,9 @@ export default function InventoryPage() {
               </p>
             </Card>
             <Card variant="elevated" padding="lg" className="text-center">
-              <span className="text-4xl md:text-5xl mb-2 block">📉</span>
+              <div className="mb-2">
+                <RemIcon icon={TrendingDown} size="xl" style="filled" className="text-yellow-500" />
+              </div>
               <p className="text-2xl md:text-3xl font-bold text-yellow-500">
                 {alerts.filter((a) => a.type === 'low_stock').length}
               </p>
@@ -266,7 +280,9 @@ export default function InventoryPage() {
               </p>
             </Card>
             <Card variant="elevated" padding="lg" className="text-center">
-              <span className="text-4xl md:text-5xl mb-2 block">📍</span>
+              <div className="mb-2">
+                <RemIcon icon={MapPin} size="xl" style="filled" className="text-blue-500" />
+              </div>
               <p className="text-2xl md:text-3xl font-bold text-blue-500">{locations.length}</p>
               <p className="text-xs md:text-sm text-[var(--color-text-secondary)] mt-1">
                 Ubicaciones
@@ -278,7 +294,7 @@ export default function InventoryPage() {
           {alerts.length > 0 && (
             <Card variant="outlined" padding="lg" className="mb-6 border-red-200 bg-red-50">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl">🚨</span>
+                <RemIcon icon={AlertCircle} size="lg" style="filled" className="text-red-500" />
                 <h2 className="text-lg md:text-xl font-semibold text-[var(--color-text-primary)]">
                   Alertas Importantes
                 </h2>
@@ -323,7 +339,11 @@ export default function InventoryPage() {
                       }
                     `}
                   >
-                    {cat === 'all' ? 'Todas' : `${getCategoryIcon(cat)} ${cat}`}
+                    {cat === 'all' ? 'Todas' : (
+                      <>
+                        {renderCategoryIcon(cat)} {cat}
+                      </>
+                    )}
                   </button>
                 ))}
               </div>
@@ -347,7 +367,11 @@ export default function InventoryPage() {
                       }
                     `}
                   >
-                    {loc === 'all' ? 'Todas' : `${getLocationIcon(loc)} ${loc}`}
+                    {loc === 'all' ? 'Todas' : (
+                      <>
+                        {renderLocationIcon(loc)} {loc}
+                      </>
+                    )}
                   </button>
                 ))}
               </div>
@@ -357,7 +381,9 @@ export default function InventoryPage() {
           {/* Empty State */}
           {inventory.length === 0 && (
             <Card variant="elevated" padding="lg" className="text-center">
-              <span className="text-6xl md:text-7xl mb-4 block">🛒</span>
+              <div className="mb-4">
+                <RemIcon icon={ShoppingCart} size="hero" style="filled" className="text-[var(--color-primary)]" />
+              </div>
               <h3 className="text-xl md:text-2xl font-semibold text-[var(--color-text-primary)] mb-2">
                 Tu inventario está vacío
               </h3>
@@ -391,8 +417,8 @@ export default function InventoryPage() {
                         index={index}
                         onEdit={() => setEditingItem(item)}
                         onDelete={() => handleDeleteItem(item.id)}
-                        getCategoryIcon={getCategoryIcon}
-                        getLocationIcon={getLocationIcon}
+                        renderCategoryIcon={renderCategoryIcon}
+                        renderLocationIcon={renderLocationIcon}
                         getExpirationColor={getExpirationColor}
                         formatExpirationDate={formatExpirationDate}
                       />
@@ -411,8 +437,8 @@ export default function InventoryPage() {
                     index={index}
                     onEdit={() => setEditingItem(item)}
                     onDelete={() => handleDeleteItem(item.id)}
-                    getCategoryIcon={getCategoryIcon}
-                    getLocationIcon={getLocationIcon}
+                    renderCategoryIcon={renderCategoryIcon}
+                    renderLocationIcon={renderLocationIcon}
                     getExpirationColor={getExpirationColor}
                     formatExpirationDate={formatExpirationDate}
                   />
@@ -423,7 +449,9 @@ export default function InventoryPage() {
 
           {filteredInventory.length === 0 && inventory.length > 0 && (
             <Card variant="outlined" padding="lg" className="text-center">
-              <span className="text-5xl mb-4 block">🔍</span>
+              <div className="mb-4">
+                <RemIcon icon={Search} size="xl" style="filled" className="text-[var(--color-text-secondary)]" />
+              </div>
               <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">
                 No hay ingredientes
               </h3>
@@ -463,8 +491,8 @@ interface InventoryCardProps {
   index: number;
   onEdit: () => void;
   onDelete: () => void;
-  getCategoryIcon: (category: string) => string;
-  getLocationIcon: (location?: string) => string;
+  renderCategoryIcon: (category: string) => React.ReactNode;
+  renderLocationIcon: (location?: string) => React.ReactNode;
   getExpirationColor: (date?: string) => string;
   formatExpirationDate: (date?: string) => string;
 }
@@ -474,8 +502,8 @@ function InventoryCard({
   index,
   onEdit,
   onDelete,
-  getCategoryIcon,
-  getLocationIcon,
+  renderCategoryIcon,
+  renderLocationIcon,
   getExpirationColor,
   formatExpirationDate,
 }: InventoryCardProps) {
@@ -489,7 +517,9 @@ function InventoryCard({
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <span className="text-5xl">{getCategoryIcon(item.category || 'Otros')}</span>
+          <div className="text-4xl">
+            {renderCategoryIcon(item.category || 'Otros')}
+          </div>
           <div>
             <h3 className="text-lg font-bold text-[var(--color-text-primary)] mb-1">
               {item.ingredientName}
@@ -498,9 +528,9 @@ function InventoryCard({
           </div>
         </div>
         {item.location && (
-          <span className="text-2xl" title={item.location}>
-            {getLocationIcon(item.location)}
-          </span>
+          <div className="text-2xl" title={item.location}>
+            {renderLocationIcon(item.location)}
+          </div>
         )}
       </div>
 
