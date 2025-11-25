@@ -9,16 +9,29 @@ import { api } from '@/lib/api/mock-api';
 import { Recipe } from '@/lib/utils/mock-data';
 import { useVoice, VoiceCommand } from '@/lib/hooks/useVoice';
 import { usePollyTTS } from '@/lib/hooks/usePollyTTS';
+import { useRecipeGuideContext } from '@/lib/contexts/RecipeGuideContext';
+import { MainLayout } from '@/components/layout';
 
 export default function CookingGuidePage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <MainLayout>
+      <RecipeGuideContent params={params} />
+    </MainLayout>
+  );
+}
+
+function RecipeGuideContent({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const unwrappedParams = React.use(params);
+  const { setGuideState, switchToVariant: switchToVariantContext, activeVariantId } = useRecipeGuideContext();
+
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isPaused, setIsPaused] = useState(false);
   const [showAllSteps, setShowAllSteps] = useState(false);
   const [activeTimers, setActiveTimers] = useState<Array<{ id: number; duration: number; remaining: number }>>([]);
   const [nextTimerId, setNextTimerId] = useState(1);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   // Voice control
   const { isListening, isSupported, transcript, toggleListening } = useVoice({
@@ -39,6 +52,30 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
       });
     }
   }, [unwrappedParams.id]);
+
+  // Actualizar contexto cuando cambia el estado
+  useEffect(() => {
+    if (recipe) {
+      setGuideState({
+        isInGuide: true,
+        recipeId: recipe.id,
+        currentStep,
+        sessionId,
+        recipe,
+      });
+    }
+
+    // Cleanup al salir
+    return () => {
+      setGuideState({
+        isInGuide: false,
+        recipeId: null,
+        currentStep: null,
+        sessionId: null,
+        recipe: null,
+      });
+    };
+  }, [recipe, currentStep, sessionId, setGuideState]);
 
   useEffect(() => {
     // Timer countdown
@@ -122,14 +159,41 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
     }
   };
 
-  const addTimer = (seconds: number) => {
+  const addTimer = (seconds: number, label?: string) => {
     setActiveTimers([...activeTimers, {
       id: nextTimerId,
       duration: seconds,
       remaining: seconds,
     }]);
     setNextTimerId(nextTimerId + 1);
+    console.log(`[Guide] Timer added: ${seconds}s${label ? ` - ${label}` : ''}`);
   };
+
+  // Escuchar evento de crear timer desde voz
+  useEffect(() => {
+    const handleCreateTimer = (e: CustomEvent) => {
+      const { duration, label } = e.detail;
+      const seconds = duration * 60; // duration viene en minutos
+      addTimer(seconds, label);
+    };
+
+    window.addEventListener('create-timer' as any, handleCreateTimer);
+    return () => window.removeEventListener('create-timer' as any, handleCreateTimer);
+  }, [activeTimers, nextTimerId]);
+
+  // Escuchar evento de variante creada desde voz
+  useEffect(() => {
+    const handleVariantCreated = (e: CustomEvent) => {
+      const { variantId } = e.detail;
+      console.log(`[Guide] Switching to variant: ${variantId}`);
+      switchToVariantContext(variantId);
+      // TODO: Recargar receta con variante aplicada
+      // Para ahora, solo actualizamos el estado del contexto
+    };
+
+    window.addEventListener('recipe-variant-created' as any, handleVariantCreated);
+    return () => window.removeEventListener('recipe-variant-created' as any, handleVariantCreated);
+  }, [switchToVariantContext]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -142,6 +206,49 @@ export default function CookingGuidePage({ params }: { params: Promise<{ id: str
       router.push(`/recipes/${unwrappedParams.id}`);
     }
   };
+
+  // Escuchar comandos de cocina desde el voice server
+  useEffect(() => {
+    const handleCookingCommand = (event: CustomEvent) => {
+      const { command, originalText } = event.detail;
+      console.log('[Guide] Comando de cocina recibido:', command, originalText);
+
+      switch (command) {
+        case 'siguiente':
+          goToNextStep();
+          break;
+        case 'anterior':
+          goToPreviousStep();
+          break;
+        case 'repetir':
+          speakCurrentStep();
+          break;
+        case 'pausar':
+          setIsPaused(true);
+          stopSpeech();
+          break;
+        case 'reanudar':
+          setIsPaused(false);
+          speakCurrentStep();
+          break;
+        case 'timer':
+          // Extraer duración del texto original
+          const match = originalText.match(/(\d+)\s*(minuto|minutos|segundo|segundos|hora|horas)/i);
+          if (match) {
+            const value = parseInt(match[1]);
+            const unit = match[2].toLowerCase();
+            let minutes = value;
+            if (unit.includes('segundo')) minutes = value / 60;
+            if (unit.includes('hora')) minutes = value * 60;
+            addTimer(Math.round(minutes));
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('cooking-command', handleCookingCommand as EventListener);
+    return () => window.removeEventListener('cooking-command', handleCookingCommand as EventListener);
+  }, [recipe, currentStep, speak, stopSpeech]);
 
   if (!recipe) {
     return (

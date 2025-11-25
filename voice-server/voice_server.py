@@ -33,21 +33,49 @@ pending_function_responses: dict[str, asyncio.Future] = {}
 
 def classify_intent(text: str) -> tuple[str, str | None]:
     """
-    Clasifica si el texto es un comando de navegación o una pregunta.
-    Returns: ("navigation" | "question", route | None)
+    Clasifica si el texto es un comando de navegación, comando de cocina o una pregunta.
+    Returns: ("navigation" | "cooking_command" | "question", command_type | route | None)
     """
     lower_text = text.lower().strip()
 
-    # Verificar si tiene verbo de navegación
+    # Comandos de cocina (cuando está en guía de receta)
+    cooking_commands = {
+        "siguiente": ["siguiente", "siguiente paso", "continua", "continúa", "avanza"],
+        "anterior": ["anterior", "paso anterior", "vuelve", "regresa", "atrás"],
+        "repetir": ["repite", "repetir", "otra vez", "de nuevo", "lee de nuevo"],
+        "pausar": ["pausa", "pausar", "detén", "detener", "espera"],
+        "reanudar": ["reanuda", "reanudar", "continua", "continúa"],
+        "timer": ["timer", "temporizador", "cronómetro", "avísame en", "alerta en"],
+    }
+
+    # Detectar comandos de cocina
+    for command_type, patterns in cooking_commands.items():
+        for pattern in patterns:
+            if pattern in lower_text:
+                # Si el comando es muy corto (1-3 palabras), es un comando directo
+                word_count = len(lower_text.split())
+                if word_count <= 3:
+                    return ("cooking_command", command_type)
+                # Si el comando tiene palabras de pregunta, es una pregunta
+                if any(q in lower_text for q in ["qué", "que", "cuál", "cual", "cómo", "como"]):
+                    # "¿cuál sería el siguiente paso?" = pregunta
+                    # "siguiente paso" = comando
+                    return ("question", None)
+                # Si tiene verbo imperativo claro, es comando
+                if any(v in lower_text for v in ["ve", "pasa", "avanza", "lee", "di", "dime"]):
+                    return ("cooking_command", command_type)
+
+    # Verificar si tiene verbo de navegación de página
     has_nav_verb = any(verb in lower_text for verb in NAVIGATION_VERBS)
 
-    # Palabras que indican pregunta (no navegación)
+    # Palabras que indican pregunta (no comando)
     question_indicators = [
         "qué", "que", "cuánto", "cuanto", "cuánta", "cuanta",
         "cuántos", "cuantos", "cuántas", "cuantas",
         "cómo", "como", "dónde", "donde", "por qué", "porque",
         "tengo", "hay", "puedo", "necesito", "falta", "busca",
-        "buscar", "encuentra", "encontrar", "dame", "dime"
+        "buscar", "encuentra", "encontrar", "dame", "dime",
+        "cuál", "cual", "sería", "seria"
     ]
     is_question = any(q in lower_text for q in question_indicators)
 
@@ -56,7 +84,7 @@ def classify_intent(text: str) -> tuple[str, str | None]:
     if is_question and not has_nav_verb:
         return ("question", None)
 
-    # Buscar sección específica
+    # Buscar sección específica de navegación de páginas
     for section_name, route in NAVIGATION_SECTIONS.items():
         if section_name in lower_text:
             # Si tiene verbo de navegación, es navegación segura
@@ -712,7 +740,48 @@ Ahora responde la pregunta del usuario basándote en el resultado:"""
             context_info += f"\nUbicación especificada: {self.kitchen_context['pending_location']}"
             context_info += f"\nNO PREGUNTES por la ubicación, ya la tenemos."
 
+        # Agregar contexto de receta si el usuario está cocinando
+        if self.kitchen_context.get("inRecipeGuide"):
+            context_info += "\n\n" + "=" * 70
+            context_info += "\n🍳 ESTÁS COCINANDO AHORA - CONTEXTO DE LA RECETA ACTIVA"
+            context_info += "\n" + "=" * 70
+
+            # Información básica
+            context_info += f"\n📖 Receta: {self.kitchen_context.get('recipeName')}"
+            context_info += f"\n📍 Paso actual: #{self.kitchen_context.get('currentStep')}"
+
+            # Instrucción del paso
+            context_info += f"\n\n📝 INSTRUCCIÓN DEL PASO ACTUAL:"
+            context_info += f"\n   {self.kitchen_context.get('currentStepInstruction')}"
+
+            # Ingredientes del paso
+            step_ingredients = self.kitchen_context.get('currentStepIngredients', [])
+            if step_ingredients:
+                context_info += f"\n\n🥬 Ingredientes en este paso:"
+                for ing in step_ingredients:
+                    context_info += f"\n   - {ing}"
+
+            # Tips, duración y advertencias
+            if self.kitchen_context.get('currentStepTip'):
+                context_info += f"\n\n💡 Tip: {self.kitchen_context.get('currentStepTip')}"
+
+            if self.kitchen_context.get('currentStepDuration'):
+                context_info += f"\n⏱️  Duración: {self.kitchen_context.get('currentStepDuration')} min"
+
+            if self.kitchen_context.get('currentStepWarning'):
+                context_info += f"\n⚠️  Advertencia: {self.kitchen_context.get('currentStepWarning')}"
+
+            context_info += "\n" + "=" * 70
+            context_info += "\n\n🎯 IMPORTANTE: El usuario está en ESTE paso AHORA."
+            context_info += "\nCuando pregunte sobre técnicas, cantidades o cómo hacer algo:"
+            context_info += "\n- Responde en contexto del paso actual"
+            context_info += "\n- Sé específico y práctico"
+            context_info += "\n- Da medidas y tiempos concretos cuando sea posible"
+            context_info += "\n- Usa segunda persona (tú/tienes/debes) NUNCA primera persona"
+
         system_content = SYSTEM_PROMPT + context_info
+
+        print(self.kitchen_context.get("inRecipeGuide"))
 
         messages = [
             {"role": "system", "content": system_content}
@@ -900,20 +969,30 @@ class VoiceServer:
             print("[WS] No hay clientes conectados")
 
     async def process_command(self, command: str):
-        """Procesa el comando: navegar o consultar LLM."""
-        intent, route = classify_intent(command)
-        print(f"[Intent]: {intent} -> '{command}' (route: {route})")
+        """Procesa el comando: navegar, comando de cocina o consultar LLM."""
+        intent, data = classify_intent(command)
+        print(f"[Intent]: {intent} -> '{command}' (data: {data})")
 
-        if intent == "navigation" and route:
-            print(f"[NAV] Enviando comando de navegación: {route}")
+        if intent == "navigation" and data:
+            print(f"[NAV] Enviando comando de navegación: {data}")
             await self.broadcast({
                 "type": "navigation",
                 "command": command,
-                "route": route
+                "route": data
             })
             # Desactivar conversación continua después de navegación
             if self.conversation_active:
                 self.deactivate_conversation_mode()
+
+        elif intent == "cooking_command" and data:
+            print(f"[COOKING] Comando de cocina: {data}")
+            await self.broadcast({
+                "type": "cooking_command",
+                "command": data,
+                "original_text": command
+            })
+            # Mantener conversación activa para comandos de cocina
+
         else:
             print(f"[LLM] Procesando pregunta: {command}")
             await self.broadcast({
@@ -1092,8 +1171,11 @@ async def handle_client(websocket):
             elif data.get("type") == "update_context":
                 # Actualizar contexto desde el frontend
                 if voice_server and voice_server.llm:
-                    voice_server.llm.update_context(data.get("context", {}))
-                    print(f"[Context] Actualizado: {data.get('context', {})}")
+                    context = data.get("context", {})
+                    voice_server.llm.update_context(context)
+                    print(f"[Context] Actualizado: {context}")
+                    if context.get("inRecipeGuide"):
+                        print(f"[Context] ✅ Usuario cocinando: {context.get('recipeName')} - Paso {context.get('currentStep')}")
 
             elif data.get("type") == "function_response":
                 # Respuesta de función del cliente

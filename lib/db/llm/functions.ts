@@ -423,6 +423,102 @@ export const llmFunctions: FunctionDefinition[] = [
       required: [],
     },
   },
+
+  // ==========================================================================
+  // RECIPE GUIDE FUNCTIONS (Cooking in Progress)
+  // ==========================================================================
+  {
+    name: 'explainCookingStep',
+    description: 'Explica con más detalle cómo realizar una técnica de cocina o un paso específico de la receta. Usa esto cuando el usuario pide más información sobre cómo hacer algo (ej: "¿cómo pico finamente?", "¿qué significa sofreír?", "¿cómo sé cuando está listo?").',
+    parameters: {
+      type: 'object',
+      properties: {
+        recipeId: {
+          type: 'string',
+          description: 'ID de la receta actual',
+        },
+        stepNumber: {
+          type: 'number',
+          description: 'Número del paso actual',
+        },
+        question: {
+          type: 'string',
+          description: 'Pregunta específica del usuario sobre la técnica o el paso',
+        },
+      },
+      required: ['recipeId', 'stepNumber', 'question'],
+    },
+  },
+  {
+    name: 'substituteIngredientInCooking',
+    description: 'Sustituye un ingrediente durante una sesión de cocina activa y crea automáticamente una variante de la receta con el cambio. Usa esto cuando el usuario quiere sustituir algo mientras cocina (ej: "¿puedo usar aceite de oliva en lugar de mantequilla?").',
+    parameters: {
+      type: 'object',
+      properties: {
+        sessionId: {
+          type: 'string',
+          description: 'ID de la sesión de cocina actual',
+        },
+        recipeId: {
+          type: 'string',
+          description: 'ID de la receta original',
+        },
+        originalIngredientId: {
+          type: 'string',
+          description: 'ID del ingrediente original en la receta',
+        },
+        substituteIngredientId: {
+          type: 'string',
+          description: 'ID del ingrediente sustituto',
+        },
+        reason: {
+          type: 'string',
+          description: 'Por qué se hizo la sustitución (opcional)',
+        },
+      },
+      required: ['sessionId', 'recipeId', 'originalIngredientId', 'substituteIngredientId'],
+    },
+  },
+  {
+    name: 'createTimerFromStep',
+    description: 'Crea un timer para el usuario basado en una duración mencionada en el paso actual o en la conversación. Usa esto cuando detectes una duración que el usuario debería cronometrar (ej: "avísame en 5 minutos", "necesito un timer de media hora").',
+    parameters: {
+      type: 'object',
+      properties: {
+        durationMinutes: {
+          type: 'number',
+          description: 'Duración del timer en minutos (puede ser decimal, ej: 0.5 para 30 segundos)',
+        },
+        label: {
+          type: 'string',
+          description: 'Etiqueta descriptiva del timer (ej: "Cocinar pollo", "Reposar masa")',
+        },
+        stepNumber: {
+          type: 'number',
+          description: 'Número del paso relacionado (opcional)',
+        },
+      },
+      required: ['durationMinutes', 'label'],
+    },
+  },
+  {
+    name: 'getCurrentStepDetails',
+    description: 'Obtiene información detallada del paso actual de la receta, incluyendo ingredientes usados, técnicas, tips y advertencias.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recipeId: {
+          type: 'string',
+          description: 'ID de la receta',
+        },
+        stepNumber: {
+          type: 'number',
+          description: 'Número del paso',
+        },
+      },
+      required: ['recipeId', 'stepNumber'],
+    },
+  },
 ];
 
 /**

@@ -2,13 +2,25 @@
 
 import { Mic, MicOff, Loader2, Wifi, WifiOff, X, Brain, AlertTriangle, Server, Database } from "lucide-react";
 import { useVoiceNavigation, VoiceStatus, VoiceError } from "@/lib/hooks/useVoiceNavigation";
+import { useRecipeGuideContext } from "@/lib/contexts/RecipeGuideContext";
+import { useEffect } from "react";
 
 /**
  * VoiceAssistant Component
  * Floating voice control widget for Rem-E
  * Adapts to the app's green/pistachio theme
+ * Now with recipe context integration for cooking guidance
  */
 export function VoiceAssistant() {
+  const {
+    isInGuide,
+    recipeId,
+    currentStep,
+    currentStepData,
+    recipe,
+    sessionId,
+  } = useRecipeGuideContext();
+
   const {
     status,
     transcript,
@@ -21,7 +33,35 @@ export function VoiceAssistant() {
     disconnect,
     clearResponse,
     clearError,
+    updateContext,
   } = useVoiceNavigation();
+
+  // Enviar contexto de receta cuando cambia
+  useEffect(() => {
+    console.log('[VoiceAssistant] Context check:', { isInGuide, recipe: recipe?.name, currentStep });
+
+    if (isInGuide && recipe) {
+      const context = {
+        inRecipeGuide: true,
+        recipeId,
+        recipeName: recipe.name,
+        currentStep,
+        currentStepInstruction: currentStepData?.instruction,
+        currentStepIngredients: currentStepData?.ingredientsUsed,
+        currentStepTip: currentStepData?.tip,
+        currentStepWarning: currentStepData?.warning,
+        currentStepDuration: currentStepData?.duration,
+        sessionId,
+      };
+      console.log('[VoiceAssistant] Sending recipe context:', context);
+      updateContext(context);
+    } else {
+      console.log('[VoiceAssistant] Not in guide, sending inRecipeGuide: false');
+      updateContext({
+        inRecipeGuide: false,
+      });
+    }
+  }, [isInGuide, recipeId, currentStep, currentStepData, recipe, sessionId, updateContext]);
 
   const handleClick = () => {
     if (status === "disconnected" || status === "error") {
@@ -33,6 +73,22 @@ export function VoiceAssistant() {
 
   return (
     <div className="fixed bottom-6 right-6 flex flex-col items-end gap-3 z-50">
+      {/* Indicador de modo receta */}
+      {isInGuide && recipe && (
+        <div
+          className="rounded-lg shadow-md px-3 py-2 text-xs font-medium border animate-fadeInDown"
+          style={{
+            background: 'rgba(151, 194, 138, 0.15)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            borderColor: 'var(--color-primary)',
+            color: 'var(--color-primary-dark)',
+          }}
+        >
+          🍳 {recipe.name} - Paso {currentStep}
+        </div>
+      )}
+
       {/* Panel de respuesta del LLM - Glassmorphism style */}
       {llmResponse && (
         <div

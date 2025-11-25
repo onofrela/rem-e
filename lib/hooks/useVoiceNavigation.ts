@@ -58,6 +58,17 @@ export interface VoiceContext {
   inventory?: string[];
   recipes?: string[];
   current_page?: string;
+  // Recipe guide context
+  inRecipeGuide?: boolean;
+  recipeId?: string | null;
+  recipeName?: string;
+  currentStep?: number | null;
+  currentStepInstruction?: string;
+  currentStepIngredients?: string[];
+  currentStepTip?: string;
+  currentStepWarning?: string;
+  currentStepDuration?: number;
+  sessionId?: string | null;
 }
 
 const WS_URL = "ws://localhost:8765";
@@ -110,6 +121,7 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoConnectAttempted = useRef(false);
 
   // Actualizar contexto en el servidor
   const updateContext = useCallback((context: VoiceContext) => {
@@ -198,6 +210,19 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
             if (data.command || data.route) {
               processNavigation(data.command || "", data.route);
             }
+            break;
+
+          case "cooking_command":
+            // Comando de cocina (siguiente, anterior, repetir, etc.)
+            console.log("[Voice] Comando de cocina recibido:", data.command);
+            // Emitir evento personalizado para que la página de guide lo maneje
+            window.dispatchEvent(new CustomEvent('cooking-command', {
+              detail: {
+                command: data.command,
+                originalText: data.original_text
+              }
+            }));
+            setStatus("listening");
             break;
 
           case "thinking":

@@ -1,6 +1,5 @@
 'use client';
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { MainLayout } from '@/components/layout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -15,6 +14,7 @@ import {
 } from '@/lib/db/services/ingredientService';
 
 export default function GlossaryPage() {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [ingredients, setIngredients] = useState<CatalogIngredient[]>([]);
   const [categories, setCategories] = useState<IngredientCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -169,17 +169,23 @@ export default function GlossaryPage() {
                 <Button variant="primary" size="md" onClick={handleExport}>
                   Exportar JSON
                 </Button>
-                <label>
-                  <Button variant="ghost" size="md" as="span">
+                <div>
+                  <Button 
+                    variant="ghost" 
+                    size="md" 
+                    onClick={() => fileInputRef.current?.click()} // Disparador manual
+                  >
                     Importar JSON
                   </Button>
+                  
                   <input
+                    ref={fileInputRef} // Conectamos la referencia
                     type="file"
                     accept=".json"
                     onChange={handleImport}
-                    className="hidden"
+                    className="hidden" // Sigue oculto, pero funcional
                   />
-                </label>
+                </div>
               </div>
             </div>
           </Card>

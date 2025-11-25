@@ -1310,6 +1310,239 @@ async function handleAdaptRecipe(args: Record<string, unknown>): Promise<Functio
 }
 
 // =============================================================================
+// RECIPE GUIDE HANDLERS (Cooking in Progress)
+// =============================================================================
+
+async function handleExplainCookingStep(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const recipeId = args.recipeId as string;
+    const stepNumber = args.stepNumber as number;
+    const question = args.question as string;
+
+    const recipe = await recipeService.getRecipeById(recipeId);
+    if (!recipe) {
+      return { success: false, error: 'Receta no encontrada' };
+    }
+
+    const step = recipe.steps.find(s => s.step === stepNumber);
+    if (!step) {
+      return { success: false, error: 'Paso no encontrado' };
+    }
+
+    // Buscar conocimiento relacionado en la base de conocimiento del usuario
+    const knowledge = await knowledgeService.getRelevantKnowledge({
+      recipeTypes: [recipe.category],
+      query: question,
+    });
+
+    return {
+      success: true,
+      data: {
+        step: step.instruction,
+        tip: step.tip,
+        warning: step.warning,
+        duration: step.duration,
+        relatedKnowledge: knowledge.slice(0, 3), // Top 3 conocimientos relevantes
+        // El LLM usará esto para generar explicación detallada
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error explicando paso de cocina',
+    };
+  }
+}
+
+async function handleSubstituteIngredientInCooking(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const sessionId = args.sessionId as string;
+    const recipeId = args.recipeId as string;
+    const originalIngredientId = args.originalIngredientId as string;
+    const substituteIngredientId = args.substituteIngredientId as string;
+    const reason = args.reason as string | undefined;
+
+    // 1. Obtener información de la sustitución
+    const substitutions = await substitutionService.getSubstitutionsForIngredient(originalIngredientId);
+    const substitution = substitutions.find(s => s.substituteIngredientId === substituteIngredientId);
+
+    if (!substitution) {
+      return {
+        success: false,
+        error: 'No se encontró información de sustitución para estos ingredientes',
+      };
+    }
+
+    // 2. Obtener nombres de ingredientes
+    const originalIng = await ingredientService.getIngredientById(originalIngredientId);
+    const substituteIng = await ingredientService.getIngredientById(substituteIngredientId);
+
+    if (!originalIng || !substituteIng) {
+      return { success: false, error: 'Ingrediente no encontrado' };
+    }
+
+    // 3. Obtener receta original
+    const recipe = await recipeService.getRecipeById(recipeId);
+    if (!recipe) {
+      return { success: false, error: 'Receta no encontrada' };
+    }
+
+    // 4. Encontrar el ingrediente en la receta y calcular nueva cantidad
+    const recipeIngredient = recipe.ingredients.find(i => i.ingredientId === originalIngredientId);
+    if (!recipeIngredient) {
+      return { success: false, error: 'Ingrediente no está en esta receta' };
+    }
+
+    const newAmount = recipeIngredient.amount * substitution.ratio;
+
+    // 5. Crear variante de la receta
+    const variantName = `${recipe.name} - ${substituteIng.name} (${new Date().toLocaleDateString()})`;
+
+    const variantParams: CreateRecipeVariantParams = {
+      baseRecipeId: recipeId,
+      name: variantName,
+      description: `Variante con ${substituteIng.name} en lugar de ${originalIng.name}`,
+      modifications: {
+        ingredients: {
+          changed: [{
+            ingredientId: originalIngredientId,
+            newIngredientId: substituteIngredientId,
+            newAmount,
+            newUnit: recipeIngredient.unit,
+            reason: reason || 'Sustitución durante cocción',
+          }],
+        },
+        steps: substitution.requiresAdjustments?.steps ? {
+          modified: substitution.requiresAdjustments.steps.map(adj => ({
+            stepNumber: adj.stepNumber,
+            changes: { instruction: adj.suggestion },
+          })),
+        } : undefined,
+      },
+      tags: ['sustitucion-automatica'],
+      createdBy: 'user',
+    };
+
+    const variant = await variantService.createVariant(variantParams);
+
+    // 6. Registrar en sesión de cocina
+    const noteParams: SaveCookingNoteParams = {
+      historyId: sessionId,
+      stepNumber: undefined,
+      content: `Sustitución: ${originalIng.name} → ${substituteIng.name} (ratio ${substitution.ratio})`,
+      type: 'substitution',
+    };
+
+    await historyService.addNoteToSession(noteParams);
+
+    // 7. Retornar variante para que el frontend cambie a ella
+    return {
+      success: true,
+      data: {
+        variantId: variant.id,
+        substitution: {
+          originalName: originalIng.name,
+          substituteName: substituteIng.name,
+          ratio: substitution.ratio,
+          newAmount,
+          impact: substitution.impact,
+          adjustments: substitution.requiresAdjustments,
+        },
+        message: 'Variante creada. La guía se actualizará automáticamente.',
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error sustituyendo ingrediente',
+    };
+  }
+}
+
+async function handleCreateTimerFromStep(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const durationMinutes = args.durationMinutes as number;
+    const label = args.label as string;
+    const stepNumber = args.stepNumber as number | undefined;
+
+    // Validar duración
+    if (durationMinutes <= 0 || durationMinutes > 1440) { // Max 24 horas
+      return {
+        success: false,
+        error: 'Duración inválida (debe ser entre 0 y 1440 minutos)',
+      };
+    }
+
+    // El timer se creará en el frontend via evento
+    // Esta función solo valida y retorna los datos
+    return {
+      success: true,
+      data: {
+        duration: durationMinutes,
+        label,
+        stepNumber,
+        shouldCreateTimer: true,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error creando timer',
+    };
+  }
+}
+
+async function handleGetCurrentStepDetails(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const recipeId = args.recipeId as string;
+    const stepNumber = args.stepNumber as number;
+
+    const recipe = await recipeService.getRecipeDetails(recipeId);
+    if (!recipe) {
+      return { success: false, error: 'Receta no encontrada' };
+    }
+
+    const step = recipe.steps.find(s => s.step === stepNumber);
+    if (!step) {
+      return { success: false, error: 'Paso no encontrado' };
+    }
+
+    // Resolver ingredientes usados en este paso
+    const ingredientsInStep = await Promise.all(
+      step.ingredientsUsed.map(async (ingId) => {
+        const recipeIng = recipe.ingredients.find(i => i.ingredientId === ingId);
+        const catalogIng = await ingredientService.getIngredientById(ingId);
+
+        return {
+          id: ingId,
+          name: recipeIng?.displayName || catalogIng?.name || 'Desconocido',
+          amount: recipeIng?.amount,
+          unit: recipeIng?.unit,
+          preparation: recipeIng?.preparation,
+        };
+      })
+    );
+
+    return {
+      success: true,
+      data: {
+        stepNumber: step.step,
+        instruction: step.instruction,
+        duration: step.duration,
+        ingredients: ingredientsInStep,
+        tip: step.tip,
+        warning: step.warning,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error obteniendo detalles del paso',
+    };
+  }
+}
+
+// =============================================================================
 // HANDLER REGISTRY
 // =============================================================================
 
@@ -1371,6 +1604,12 @@ const handlers: Record<string, FunctionHandler> = {
 
   // Adaptation handlers
   adaptRecipe: handleAdaptRecipe,
+
+  // Recipe guide handlers (cooking in progress)
+  explainCookingStep: handleExplainCookingStep,
+  substituteIngredientInCooking: handleSubstituteIngredientInCooking,
+  createTimerFromStep: handleCreateTimerFromStep,
+  getCurrentStepDetails: handleGetCurrentStepDetails,
 };
 
 /**
