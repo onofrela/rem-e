@@ -11,6 +11,11 @@ import * as inventoryService from '../services/inventoryService';
 import * as compatibilityService from '../services/compatibilityService';
 import * as applianceService from '../services/applianceService';
 import * as userApplianceService from '../services/userApplianceService';
+import * as substitutionService from '../services/substitutionService';
+import * as variantService from '../services/variantService';
+import * as historyService from '../services/historyService';
+import * as knowledgeService from '../services/knowledgeService';
+import * as adaptationService from '../services/adaptationService';
 import type {
   SearchIngredientsParams,
   GetInventoryParams,
@@ -21,7 +26,14 @@ import type {
   StorageLocation,
   RecipeDifficulty,
   RecipeCategory,
-  SearchAppliancesParams
+  SearchAppliancesParams,
+  SuggestSubstitutionParams,
+  GetRecipeVariantsParams,
+  CreateRecipeVariantParams,
+  SaveCookingNoteParams,
+  RecordSubstitutionPreferenceParams,
+  CompleteRecipeSessionParams,
+  AdaptRecipeParams
 } from '../schemas/types';
 
 // =============================================================================
@@ -893,6 +905,411 @@ async function handleHasAppliance(args: Record<string, unknown>): Promise<Functi
 }
 
 // =============================================================================
+// SUBSTITUTION HANDLERS
+// =============================================================================
+
+async function handleSuggestSubstitution(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const originalIngredientId = args.originalIngredientId as string;
+    const recipeId = args.recipeId as string | undefined;
+
+    const ingredient = await ingredientService.getIngredientById(originalIngredientId);
+    if (!ingredient) {
+      return { success: false, error: 'Ingrediente original no encontrado' };
+    }
+
+    let recipeContext;
+    if (recipeId) {
+      const recipe = await recipeService.getRecipeById(recipeId);
+      if (recipe) {
+        recipeContext = {
+          recipeType: recipe.category,
+          cuisine: recipe.cuisine
+        };
+      }
+    }
+
+    const bestSub = await substitutionService.getBestSubstitute(originalIngredientId, recipeContext);
+
+    if (!bestSub.substitution) {
+      return {
+        success: true,
+        data: {
+          found: false,
+          message: `No encontré sustitutos adecuados para ${ingredient.name}`
+        }
+      };
+    }
+
+    const substituteIngredient = await ingredientService.getIngredientById(bestSub.substitution.substituteIngredientId);
+
+    return {
+      success: true,
+      data: {
+        found: true,
+        original: {
+          id: originalIngredientId,
+          name: ingredient.name
+        },
+        substitute: {
+          id: bestSub.substitution.substituteIngredientId,
+          name: substituteIngredient?.name || 'Desconocido'
+        },
+        ratio: bestSub.substitution.ratio,
+        confidence: bestSub.substitution.confidence,
+        reason: bestSub.substitution.reason,
+        impact: bestSub.analysis,
+        userPreferred: bestSub.userPreferred
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error sugiriendo sustitución'
+    };
+  }
+}
+
+async function handleRecordSubstitutionPreference(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const params: RecordSubstitutionPreferenceParams = {
+      originalIngredientId: args.originalIngredientId as string,
+      substituteIngredientId: args.substituteIngredientId as string,
+      context: args.context as string[],
+      successful: args.successful as boolean,
+      notes: args.notes as string | undefined
+    };
+
+    await substitutionService.recordSubstitutionUsage(
+      params.originalIngredientId,
+      params.substituteIngredientId,
+      params.context,
+      params.successful,
+      params.notes
+    );
+
+    // Also learn from this for the knowledge base
+    if (params.successful) {
+      const historyId = args.historyId as string | undefined;
+      const recipeId = args.recipeId as string | undefined;
+
+      if (recipeId) {
+        await knowledgeService.learnFromSubstitution(
+          params.originalIngredientId,
+          params.substituteIngredientId,
+          recipeId,
+          historyId
+        );
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        message: 'Preferencia de sustitución guardada exitosamente'
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error guardando preferencia'
+    };
+  }
+}
+
+// =============================================================================
+// VARIANT HANDLERS
+// =============================================================================
+
+async function handleGetRecipeVariants(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const recipeId = args.recipeId as string;
+    const tags = args.tags as string[] | undefined;
+
+    const variants = await variantService.getRecipeVariants(recipeId, tags);
+
+    if (variants.length === 0) {
+      return {
+        success: true,
+        data: {
+          variants: [],
+          message: 'No hay variantes disponibles para esta receta'
+        }
+      };
+    }
+
+    const summaries = variants.map(v => variantService.getVariantSummary(v));
+
+    return {
+      success: true,
+      data: {
+        variants: summaries,
+        count: variants.length
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error obteniendo variantes'
+    };
+  }
+}
+
+async function handleCreateRecipeVariant(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const params: CreateRecipeVariantParams = {
+      baseRecipeId: args.baseRecipeId as string,
+      name: args.name as string,
+      description: args.description as string,
+      modifications: args.modifications as CreateRecipeVariantParams['modifications'],
+      tags: args.tags as string[]
+    };
+
+    const variant = await variantService.createVariant(params);
+
+    return {
+      success: true,
+      data: {
+        variantId: variant.id,
+        message: `Variante "${variant.name}" creada exitosamente`
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error creando variante'
+    };
+  }
+}
+
+async function handleApplyVariant(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const baseRecipeId = args.baseRecipeId as string;
+    const variantId = args.variantId as string;
+
+    const adaptedRecipe = await variantService.applyVariantToRecipe(baseRecipeId, variantId);
+
+    return {
+      success: true,
+      data: {
+        recipe: {
+          id: adaptedRecipe.id,
+          name: adaptedRecipe.name,
+          description: adaptedRecipe.description,
+          ingredients: adaptedRecipe.ingredients,
+          steps: adaptedRecipe.steps,
+          time: adaptedRecipe.time,
+          difficulty: adaptedRecipe.difficulty,
+          servings: adaptedRecipe.servings
+        }
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error aplicando variante'
+    };
+  }
+}
+
+// =============================================================================
+// HISTORY HANDLERS
+// =============================================================================
+
+async function handleStartCookingSession(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const recipeId = args.recipeId as string;
+    const variantId = args.variantId as string | undefined;
+    const servingsMade = args.servingsMade as number | undefined;
+
+    const history = await historyService.createHistoryEntry(recipeId, variantId, servingsMade);
+
+    return {
+      success: true,
+      data: {
+        sessionId: history.id,
+        message: 'Sesión de cocina iniciada'
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error iniciando sesión'
+    };
+  }
+}
+
+async function handleAddCookingNote(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const params: SaveCookingNoteParams = {
+      historyId: args.historyId as string,
+      stepNumber: args.stepNumber as number | undefined,
+      content: args.content as string,
+      type: args.type as SaveCookingNoteParams['type']
+    };
+
+    await historyService.addNoteToSession(params);
+
+    // Learn from valuable notes
+    if ((params.type === 'tip' || params.type === 'modification') && params.historyId) {
+      const history = await historyService.getHistoryById(params.historyId);
+      if (history) {
+        await knowledgeService.learnFromSessionNote(
+          params.content,
+          params.type,
+          history.recipeId,
+          params.historyId
+        );
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        message: 'Nota guardada exitosamente'
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error guardando nota'
+    };
+  }
+}
+
+async function handleCompleteCookingSession(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const params: CompleteRecipeSessionParams = {
+      historyId: args.historyId as string,
+      rating: args.rating as number | undefined,
+      wouldMakeAgain: args.wouldMakeAgain as boolean | undefined,
+      completionNotes: args.completionNotes as string | undefined
+    };
+
+    await historyService.completeHistoryEntry(params);
+
+    return {
+      success: true,
+      data: {
+        message: 'Sesión de cocina completada exitosamente'
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error completando sesión'
+    };
+  }
+}
+
+async function handleGetRecipeHistory(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const recipeId = args.recipeId as string | undefined;
+
+    const histories = recipeId
+      ? await historyService.getRecipeHistory(recipeId)
+      : await historyService.getRecentHistory(10);
+
+    return {
+      success: true,
+      data: {
+        sessions: histories.map(h => ({
+          id: h.id,
+          recipeId: h.recipeId,
+          startedAt: h.startedAt,
+          completedAt: h.completedAt,
+          completed: h.completed,
+          rating: h.rating,
+          servingsMade: h.servingsMade
+        })),
+        count: histories.length
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error obteniendo historial'
+    };
+  }
+}
+
+// =============================================================================
+// KNOWLEDGE BASE HANDLERS
+// =============================================================================
+
+async function handleGetUserKnowledgeContext(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const recipeId = args.recipeId as string | undefined;
+
+    let context;
+    if (recipeId) {
+      const recipe = await recipeService.getRecipeById(recipeId);
+      if (recipe) {
+        context = {
+          recipeType: recipe.category,
+          ingredientIds: recipe.ingredients.map(i => i.ingredientId)
+        };
+      }
+    }
+
+    const llmContext = await knowledgeService.buildLLMContext(context);
+    const structured = await knowledgeService.buildStructuredLLMContext(context);
+
+    return {
+      success: true,
+      data: {
+        textContext: llmContext,
+        structured: structured
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error obteniendo contexto del usuario'
+    };
+  }
+}
+
+// =============================================================================
+// ADAPTATION HANDLERS
+// =============================================================================
+
+async function handleAdaptRecipe(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const params: AdaptRecipeParams = {
+      recipeId: args.recipeId as string,
+      missingIngredients: args.missingIngredients as string[] | undefined,
+      missingAppliances: args.missingAppliances as string[] | undefined,
+      dietaryRestrictions: args.dietaryRestrictions as string[] | undefined,
+      servings: args.servings as number | undefined
+    };
+
+    const result = await adaptationService.adaptRecipe(params);
+
+    return {
+      success: true,
+      data: {
+        adaptedRecipe: {
+          name: result.adaptedRecipe.name,
+          description: result.adaptedRecipe.description,
+          ingredients: result.adaptedRecipe.ingredients,
+          steps: result.adaptedRecipe.steps,
+          time: result.adaptedRecipe.time,
+          servings: result.adaptedRecipe.servings
+        },
+        adaptations: result.adaptations,
+        warnings: result.adaptations.warnings
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error adaptando receta'
+    };
+  }
+}
+
+// =============================================================================
 // HANDLER REGISTRY
 // =============================================================================
 
@@ -933,6 +1350,27 @@ const handlers: Record<string, FunctionHandler> = {
   getUserAppliances: handleGetUserAppliances,
   searchAppliances: handleSearchAppliances,
   hasAppliance: handleHasAppliance,
+
+  // Substitution handlers
+  suggestSubstitution: handleSuggestSubstitution,
+  recordSubstitutionPreference: handleRecordSubstitutionPreference,
+
+  // Variant handlers
+  getRecipeVariants: handleGetRecipeVariants,
+  createRecipeVariant: handleCreateRecipeVariant,
+  applyVariant: handleApplyVariant,
+
+  // History handlers
+  startCookingSession: handleStartCookingSession,
+  addCookingNote: handleAddCookingNote,
+  completeCookingSession: handleCompleteCookingSession,
+  getRecipeHistory: handleGetRecipeHistory,
+
+  // Knowledge base handlers
+  getUserKnowledgeContext: handleGetUserKnowledgeContext,
+
+  // Adaptation handlers
+  adaptRecipe: handleAdaptRecipe,
 };
 
 /**

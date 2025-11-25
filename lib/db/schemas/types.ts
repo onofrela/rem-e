@@ -557,3 +557,426 @@ export interface AppliancesDatabase {
   metadata: DatabaseMetadata;
   appliances: CatalogAppliance[];
 }
+
+// =============================================================================
+// INGREDIENT SUBSTITUTION TYPES
+// =============================================================================
+
+/**
+ * Contextual factors that affect substitution viability
+ */
+export interface SubstitutionContextualFactors {
+  recipeTypes: string[];          // e.g., ["repostería", "salado", "frito"]
+  cuisines: string[];             // e.g., ["mexicana", "italiana", "asiática"]
+  cookingMethods: string[];       // e.g., ["horneado", "frito", "hervido"]
+}
+
+/**
+ * Impact analysis of a substitution on the final dish
+ */
+export interface SubstitutionImpact {
+  taste?: string;                 // e.g., "Más dulce", "Menos cremoso"
+  texture?: string;               // e.g., "Más denso", "Más esponjoso"
+  color?: string;                 // e.g., "Más oscuro", "Más pálido"
+  nutritional?: string;           // e.g., "Menos calorías", "Más proteína"
+}
+
+/**
+ * Adjustments needed when making a substitution
+ */
+export interface SubstitutionAdjustments {
+  otherIngredients?: {
+    ingredientId: string;
+    adjustment: string;           // e.g., "Reduce líquido en 1/4"
+  }[];
+  steps?: {
+    stepNumber?: number;
+    suggestion: string;           // e.g., "Aumenta el tiempo de horneado 5 min"
+  }[];
+  timing?: {
+    adjustment: number;           // minutes +/-
+    reason: string;               // e.g., "La harina de almendra requiere más tiempo"
+  };
+}
+
+/**
+ * Enhanced ingredient substitution with contextual analysis
+ */
+export interface IngredientSubstitution {
+  id: string;
+  originalIngredientId: string;
+  substituteIngredientId: string;
+  ratio: number;                  // e.g., 0.75 = use 75% of original amount
+  confidence: number;             // 0-1, how reliable this substitution is
+
+  // Contextual analysis
+  contextualFactors: SubstitutionContextualFactors;
+
+  // Impact on final dish
+  impact: SubstitutionImpact;
+
+  // Required adjustments
+  requiresAdjustments?: SubstitutionAdjustments;
+
+  // Metadata
+  dietaryTags: string[];          // e.g., ["vegetarian", "vegan", "gluten-free"]
+  reason: string;                 // Why this substitution works
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * User's learned preference for ingredient substitution
+ */
+export interface UserSubstitutionPreference {
+  id: string;
+  userId?: string;                // For multi-user support
+  originalIngredientId: string;
+  preferredSubstituteId: string;
+
+  // Learning data
+  timesUsed: number;              // How many times user chose this
+  successRate: number;            // 0-1, based on ratings/completion
+  lastUsedAt: string;
+
+  // Context tracking (for LLM)
+  contexts: string[];             // e.g., ["repostería", "brownies", "sin gluten"]
+  notes?: string;                 // User's notes about this preference
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+// =============================================================================
+// RECIPE VARIANT TYPES
+// =============================================================================
+
+/**
+ * Ingredient modifications for a recipe variant
+ */
+export interface VariantIngredientModifications {
+  removed: string[];              // IDs of ingredients to remove
+  added: RecipeIngredient[];      // New ingredients to add
+  modified: {
+    ingredientId: string;
+    newAmount: number;
+    newUnit: string;
+    reason?: string;              // Why this was changed
+  }[];
+}
+
+/**
+ * Step modifications for a recipe variant
+ */
+export interface VariantStepModifications {
+  modified: {
+    stepNumber: number;
+    newInstruction: string;
+    reason?: string;              // Why this was changed
+  }[];
+  added: RecipeStep[];            // Additional steps
+  removed: number[];              // Step numbers to remove
+}
+
+/**
+ * Metadata changes for a recipe variant
+ */
+export interface VariantMetadataChanges {
+  timeAdjustment?: number;        // minutes +/-
+  difficultyChange?: RecipeDifficulty;
+  servingsChange?: number;
+}
+
+/**
+ * Complete modifications for a recipe variant
+ */
+export interface RecipeVariantModifications {
+  ingredients: VariantIngredientModifications;
+  steps: VariantStepModifications;
+  metadata?: VariantMetadataChanges;
+}
+
+/**
+ * A variant of a base recipe (e.g., gluten-free version, vegan version)
+ */
+export interface RecipeVariant {
+  id: string;
+  baseRecipeId: string;           // Reference to original Recipe.id
+  name: string;                   // e.g., "Versión sin gluten", "Con harina de almendra"
+  description: string;            // Brief description of changes
+
+  // Only store changes, not entire recipe
+  modifications: RecipeVariantModifications;
+
+  // Categorization
+  tags: string[];                 // e.g., ["sin-gluten", "vegano", "baja-grasa"]
+
+  // Metadata
+  createdBy: 'user' | 'system';   // Who created this variant
+  createdAt: string;
+  updatedAt: string;
+  timesUsed: number;              // Tracking popularity
+}
+
+// =============================================================================
+// RECIPE APPLIANCE TYPES
+// =============================================================================
+
+/**
+ * Appliance alternative with adaptation instructions
+ */
+export interface ApplianceAlternative {
+  applianceId: string;            // ID of alternative appliance
+  confidence: number;             // 0-1, how well this works
+  adaptationInstructions: string; // How to use this alternative
+
+  // Adjustments needed
+  adjustments?: {
+    timing?: {
+      minutes: number;            // +/- adjustment
+      reason: string;
+    };
+    temperature?: {
+      degrees: number;            // +/- adjustment
+      reason: string;
+    };
+    technique?: string;           // Different technique description
+  };
+
+  // Modified steps if needed
+  modifiedSteps?: {
+    stepNumber: number;
+    newInstruction: string;
+  }[];
+}
+
+/**
+ * Appliance requirement for a recipe
+ */
+export interface RecipeAppliance {
+  applianceId: string;            // Reference to CatalogAppliance.id
+  required: boolean;              // True if essential, false if optional
+  usedInSteps: number[];          // Which steps use this appliance
+  alternatives: ApplianceAlternative[];
+}
+
+// =============================================================================
+// RECIPE HISTORY TYPES
+// =============================================================================
+
+/**
+ * A substitution made during a cooking session
+ */
+export interface SessionSubstitution {
+  originalIngredientId: string;
+  substituteIngredientId: string;
+  reason?: string;                // User's reason for substitution
+  stepNumber?: number;            // When it was used
+}
+
+/**
+ * A note made during a cooking session
+ */
+export interface SessionNote {
+  stepNumber?: number;            // Which step (if applicable)
+  content: string;
+  type: 'tip' | 'warning' | 'modification' | 'clarification';
+  timestamp: string;
+}
+
+/**
+ * An adjustment made during a cooking session
+ */
+export interface SessionAdjustment {
+  type: 'timing' | 'temperature' | 'quantity' | 'technique';
+  description: string;
+  stepNumber?: number;
+}
+
+/**
+ * Changes made during a cooking session
+ */
+export interface RecipeSessionChanges {
+  substitutions: SessionSubstitution[];
+  notes: SessionNote[];
+  adjustments: SessionAdjustment[];
+}
+
+/**
+ * Historical record of a recipe execution
+ */
+export interface RecipeHistory {
+  id: string;
+  recipeId: string;               // Which recipe was made
+  variantId?: string;             // If a variant was used
+  userId?: string;                // For multi-user support
+
+  // Timing
+  startedAt: string;
+  completedAt?: string;
+  completed: boolean;
+
+  // Session data
+  sessionChanges: RecipeSessionChanges;
+
+  // Simple metadata
+  servingsMade: number;
+  rating?: number;                // 1-5 stars
+  wouldMakeAgain?: boolean;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+// =============================================================================
+// USER KNOWLEDGE BASE TYPES
+// =============================================================================
+
+/**
+ * Types of knowledge that can be learned about the user
+ */
+export type UserKnowledgeType =
+  | 'measurement-preference'      // e.g., prefers cups over grams
+  | 'equipment-limitation'        // e.g., no digital scale
+  | 'skill-note'                  // e.g., struggles with folding technique
+  | 'ingredient-preference'       // e.g., prefers organic ingredients
+  | 'general-tip';                // e.g., always double vanilla
+
+/**
+ * What this knowledge applies to
+ */
+export interface KnowledgeApplicability {
+  recipeTypes?: string[];         // e.g., ["repostería", "pan"]
+  ingredients?: string[];         // Ingredient IDs
+  appliances?: string[];          // Appliance IDs
+  cookingMethods?: string[];      // e.g., ["horneado", "frito"]
+}
+
+/**
+ * Structured content of a knowledge entry
+ */
+export interface UserKnowledgeContent {
+  summary: string;                // Brief summary for LLM context
+  details: string;                // Full details
+  context?: string[];             // Contextual tags for filtering
+  appliesTo?: KnowledgeApplicability;
+}
+
+/**
+ * Where this knowledge was learned from
+ */
+export interface KnowledgeSource {
+  recipeId?: string;
+  historyId?: string;             // Reference to RecipeHistory
+  timestamp: string;
+}
+
+/**
+ * A piece of learned knowledge about the user
+ */
+export interface UserKnowledgeEntry {
+  id: string;
+  userId?: string;                // For multi-user support
+  type: UserKnowledgeType;
+
+  // Structured content for LLM
+  content: UserKnowledgeContent;
+
+  // Learning metadata
+  learnedFrom?: KnowledgeSource;
+  confidence: number;             // 0-1, how confident the system is
+  timesApplied: number;           // How often this knowledge has been used
+  lastAppliedAt?: string;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+// =============================================================================
+// EXTENDED RECIPE TYPE
+// =============================================================================
+
+/**
+ * Extended Recipe interface with new fields
+ * (backwards compatible - all new fields are optional)
+ */
+export interface ExtendedRecipe extends Recipe {
+  requiredAppliances?: RecipeAppliance[];
+  optionalAppliances?: RecipeAppliance[];
+}
+
+// =============================================================================
+// LLM FUNCTION PARAMETER TYPES (NEW)
+// =============================================================================
+
+/**
+ * Parameters for suggesting ingredient substitution
+ */
+export interface SuggestSubstitutionParams {
+  originalIngredientId: string;
+  substituteIngredientId?: string; // Optional - if not provided, suggest best
+  recipeId?: string;              // Context for better suggestions
+  recipeType?: string;            // e.g., "repostería", "salado"
+}
+
+/**
+ * Parameters for getting recipe variants
+ */
+export interface GetRecipeVariantsParams {
+  recipeId: string;
+  tags?: string[];                // Filter by tags
+}
+
+/**
+ * Parameters for creating a recipe variant
+ */
+export interface CreateRecipeVariantParams {
+  baseRecipeId: string;
+  name: string;
+  description: string;
+  modifications: RecipeVariantModifications;
+  tags: string[];
+}
+
+/**
+ * Parameters for saving a cooking note
+ */
+export interface SaveCookingNoteParams {
+  historyId: string;              // Which cooking session
+  stepNumber?: number;
+  content: string;
+  type: 'tip' | 'warning' | 'modification' | 'clarification';
+}
+
+/**
+ * Parameters for recording substitution preference
+ */
+export interface RecordSubstitutionPreferenceParams {
+  originalIngredientId: string;
+  substituteIngredientId: string;
+  context: string[];              // e.g., ["repostería", "brownies"]
+  successful: boolean;            // Whether it worked well
+  notes?: string;
+}
+
+/**
+ * Parameters for completing a recipe session
+ */
+export interface CompleteRecipeSessionParams {
+  historyId: string;
+  rating?: number;                // 1-5
+  wouldMakeAgain?: boolean;
+  completionNotes?: string;
+}
+
+/**
+ * Parameters for adapting a recipe
+ */
+export interface AdaptRecipeParams {
+  recipeId: string;
+  missingIngredients?: string[];  // Ingredients user doesn't have
+  missingAppliances?: string[];   // Appliances user doesn't have
+  dietaryRestrictions?: string[]; // e.g., ["vegetarian", "gluten-free"]
+  servings?: number;              // Adjust serving size
+}

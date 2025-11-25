@@ -14,7 +14,12 @@ import type {
   Recipe,
   Location,
   CatalogAppliance,
-  UserAppliance
+  UserAppliance,
+  IngredientSubstitution,
+  UserSubstitutionPreference,
+  RecipeVariant,
+  RecipeHistory,
+  UserKnowledgeEntry
 } from '../schemas/types';
 
 // =============================================================================
@@ -22,7 +27,7 @@ import type {
 // =============================================================================
 
 const DB_NAME = 'RemEDatabase';
-const DB_VERSION = 4; // Increment when schema changes
+const DB_VERSION = 5; // Increment when schema changes (added substitutions, variants, history, knowledge)
 
 // Store names
 export const STORES = {
@@ -33,6 +38,13 @@ export const STORES = {
   LOCATIONS: 'locations',
   APPLIANCES_CACHE: 'appliancesCache',
   USER_APPLIANCES: 'userAppliances',
+
+  // New stores for advanced features
+  INGREDIENT_SUBSTITUTIONS: 'ingredientSubstitutions',
+  USER_SUBSTITUTION_PREFS: 'userSubstitutionPrefs',
+  RECIPE_VARIANTS: 'recipeVariants',
+  RECIPE_HISTORY: 'recipeHistory',
+  USER_KNOWLEDGE: 'userKnowledge',
 } as const;
 
 // =============================================================================
@@ -124,6 +136,54 @@ export function openDatabase(): Promise<IDBDatabase> {
         const userAppliancesStore = db.createObjectStore(STORES.USER_APPLIANCES, { keyPath: 'id' });
         userAppliancesStore.createIndex('applianceId', 'applianceId', { unique: false });
         userAppliancesStore.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+
+      // Create Ingredient Substitutions store
+      if (!db.objectStoreNames.contains(STORES.INGREDIENT_SUBSTITUTIONS)) {
+        const substitutionsStore = db.createObjectStore(STORES.INGREDIENT_SUBSTITUTIONS, { keyPath: 'id' });
+        substitutionsStore.createIndex('originalIngredientId', 'originalIngredientId', { unique: false });
+        substitutionsStore.createIndex('substituteIngredientId', 'substituteIngredientId', { unique: false });
+        substitutionsStore.createIndex('confidence', 'confidence', { unique: false });
+        // Compound index for efficient lookups
+        substitutionsStore.createIndex('substitutionPair', ['originalIngredientId', 'substituteIngredientId'], { unique: false });
+      }
+
+      // Create User Substitution Preferences store
+      if (!db.objectStoreNames.contains(STORES.USER_SUBSTITUTION_PREFS)) {
+        const userSubsStore = db.createObjectStore(STORES.USER_SUBSTITUTION_PREFS, { keyPath: 'id' });
+        userSubsStore.createIndex('originalIngredientId', 'originalIngredientId', { unique: false });
+        userSubsStore.createIndex('preferredSubstituteId', 'preferredSubstituteId', { unique: false });
+        userSubsStore.createIndex('timesUsed', 'timesUsed', { unique: false });
+        userSubsStore.createIndex('lastUsedAt', 'lastUsedAt', { unique: false });
+      }
+
+      // Create Recipe Variants store
+      if (!db.objectStoreNames.contains(STORES.RECIPE_VARIANTS)) {
+        const variantsStore = db.createObjectStore(STORES.RECIPE_VARIANTS, { keyPath: 'id' });
+        variantsStore.createIndex('baseRecipeId', 'baseRecipeId', { unique: false });
+        variantsStore.createIndex('createdBy', 'createdBy', { unique: false });
+        variantsStore.createIndex('timesUsed', 'timesUsed', { unique: false });
+        variantsStore.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+
+      // Create Recipe History store
+      if (!db.objectStoreNames.contains(STORES.RECIPE_HISTORY)) {
+        const historyStore = db.createObjectStore(STORES.RECIPE_HISTORY, { keyPath: 'id' });
+        historyStore.createIndex('recipeId', 'recipeId', { unique: false });
+        historyStore.createIndex('variantId', 'variantId', { unique: false });
+        historyStore.createIndex('completed', 'completed', { unique: false });
+        historyStore.createIndex('startedAt', 'startedAt', { unique: false });
+        historyStore.createIndex('completedAt', 'completedAt', { unique: false });
+      }
+
+      // Create User Knowledge store
+      if (!db.objectStoreNames.contains(STORES.USER_KNOWLEDGE)) {
+        const knowledgeStore = db.createObjectStore(STORES.USER_KNOWLEDGE, { keyPath: 'id' });
+        knowledgeStore.createIndex('type', 'type', { unique: false });
+        knowledgeStore.createIndex('confidence', 'confidence', { unique: false });
+        knowledgeStore.createIndex('timesApplied', 'timesApplied', { unique: false });
+        knowledgeStore.createIndex('lastAppliedAt', 'lastAppliedAt', { unique: false });
+        knowledgeStore.createIndex('createdAt', 'createdAt', { unique: false });
       }
     };
   });
@@ -504,6 +564,11 @@ export async function getDatabaseStats(): Promise<{
   locationsCount: number;
   appliancesCacheCount: number;
   userAppliancesCount: number;
+  substitutionsCount: number;
+  userSubstitutionPrefsCount: number;
+  recipeVariantsCount: number;
+  recipeHistoryCount: number;
+  userKnowledgeCount: number;
 }> {
   const [
     inventoryCount,
@@ -511,7 +576,12 @@ export async function getDatabaseStats(): Promise<{
     recipesCacheCount,
     locationsCount,
     appliancesCacheCount,
-    userAppliancesCount
+    userAppliancesCount,
+    substitutionsCount,
+    userSubstitutionPrefsCount,
+    recipeVariantsCount,
+    recipeHistoryCount,
+    userKnowledgeCount
   ] = await Promise.all([
     countItems(STORES.INVENTORY),
     countItems(STORES.INGREDIENTS_CACHE),
@@ -519,6 +589,11 @@ export async function getDatabaseStats(): Promise<{
     countItems(STORES.LOCATIONS),
     countItems(STORES.APPLIANCES_CACHE),
     countItems(STORES.USER_APPLIANCES),
+    countItems(STORES.INGREDIENT_SUBSTITUTIONS),
+    countItems(STORES.USER_SUBSTITUTION_PREFS),
+    countItems(STORES.RECIPE_VARIANTS),
+    countItems(STORES.RECIPE_HISTORY),
+    countItems(STORES.USER_KNOWLEDGE),
   ]);
 
   return {
@@ -527,7 +602,12 @@ export async function getDatabaseStats(): Promise<{
     recipesCacheCount,
     locationsCount,
     appliancesCacheCount,
-    userAppliancesCount
+    userAppliancesCount,
+    substitutionsCount,
+    userSubstitutionPrefsCount,
+    recipeVariantsCount,
+    recipeHistoryCount,
+    userKnowledgeCount
   };
 }
 
