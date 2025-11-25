@@ -374,32 +374,31 @@ function cleanIngredientForExport(ingredient: CatalogIngredient): Omit<CatalogIn
 }
 
 /**
- * Export all ingredients to clean JSON string (without IDs for sharing)
+ * Export all ingredients to JSON string with IDs preserved
+ * IMPORTANT: IDs are included to maintain recipe references
  */
 export async function exportIngredientsClean(): Promise<string> {
   const ingredients = await getAllIngredients();
-  const cleanedIngredients = ingredients.map(ing => {
-    // Remove id and any internal tracking fields
-    const { id, ...rest } = ing;
-    return rest;
-  });
 
+  // IMPORTANT: Preserve IDs to maintain references in recipes
+  // Do NOT remove IDs as recipes depend on them
   return JSON.stringify({
     version: '1.0.0',
     exportDate: new Date().toISOString().split('T')[0],
-    count: cleanedIngredients.length,
-    ingredients: cleanedIngredients,
+    count: ingredients.length,
+    ingredients: ingredients,
   }, null, 2);
 }
 
 /**
  * Validate ingredient data structure
+ * Note: ID is optional during validation - will be preserved if present or generated if missing
  */
-function validateIngredient(data: unknown): data is Omit<CatalogIngredient, 'id'> {
+function validateIngredient(data: unknown): data is Partial<CatalogIngredient> {
   if (!data || typeof data !== 'object') return false;
   const ing = data as Record<string, unknown>;
 
-  // Required fields
+  // Required fields (ID is optional - will be handled during import)
   const requiredFields = ['name', 'normalizedName', 'category', 'subcategory', 'defaultUnit'];
   for (const field of requiredFields) {
     if (typeof ing[field] !== 'string') return false;
@@ -459,22 +458,25 @@ export async function importIngredientsFromJSON(
         continue;
       }
 
-      // Generate ID if not present
+      const rawIngCast = rawIng as Partial<CatalogIngredient>;
+
+      // IMPORTANT: Preserve existing ID if present (for recipe references)
+      // Only generate new ID if missing (for backwards compatibility)
       const ingredient: CatalogIngredient = {
-        id: (rawIng as CatalogIngredient).id || `ing_${String(idCounter++).padStart(3, '0')}`,
-        name: (rawIng as CatalogIngredient).name,
-        normalizedName: (rawIng as CatalogIngredient).normalizedName,
-        category: (rawIng as CatalogIngredient).category,
-        subcategory: (rawIng as CatalogIngredient).subcategory,
-        synonyms: (rawIng as CatalogIngredient).synonyms || [],
-        defaultUnit: (rawIng as CatalogIngredient).defaultUnit,
-        alternativeUnits: (rawIng as CatalogIngredient).alternativeUnits || [],
-        nutrition: (rawIng as CatalogIngredient).nutrition,
-        storage: (rawIng as CatalogIngredient).storage,
-        compatibleWith: (rawIng as CatalogIngredient).compatibleWith || [],
-        substitutes: (rawIng as CatalogIngredient).substitutes || [],
-        isCommon: (rawIng as CatalogIngredient).isCommon ?? false,
-        imageUrl: (rawIng as CatalogIngredient).imageUrl,
+        id: rawIngCast.id || `ing_${String(idCounter++).padStart(3, '0')}`,
+        name: rawIngCast.name!,
+        normalizedName: rawIngCast.normalizedName!,
+        category: rawIngCast.category!,
+        subcategory: rawIngCast.subcategory!,
+        synonyms: rawIngCast.synonyms || [],
+        defaultUnit: rawIngCast.defaultUnit!,
+        alternativeUnits: rawIngCast.alternativeUnits || [],
+        nutrition: rawIngCast.nutrition!,
+        storage: rawIngCast.storage!,
+        compatibleWith: rawIngCast.compatibleWith || [],
+        substitutes: rawIngCast.substitutes || [],
+        isCommon: rawIngCast.isCommon ?? false,
+        imageUrl: rawIngCast.imageUrl,
       };
 
       validIngredients.push(ingredient);

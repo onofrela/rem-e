@@ -471,7 +471,8 @@ export async function getRecipeDetails(recipeId: string): Promise<{
 // =============================================================================
 
 /**
- * Export all recipes to JSON string (clean format for backup/transfer)
+ * Export all recipes to JSON string with IDs preserved
+ * IMPORTANT: Both recipe IDs and ingredient IDs are included to maintain proper references
  */
 export async function exportRecipesClean(): Promise<string> {
   const recipes = await getAllRecipes();
@@ -508,9 +509,25 @@ export async function importRecipesFromJSON(jsonString: string): Promise<{
     // Validate each recipe
     for (const recipe of data.recipes) {
       try {
-        // Basic validation
+        // Basic validation - ID is required to maintain references
         if (!recipe.id || !recipe.name || !recipe.ingredients || !recipe.steps) {
-          errors.push(`Receta inválida: ${recipe.name || 'sin nombre'} - faltan campos requeridos`);
+          errors.push(`Receta inválida: ${recipe.name || 'sin nombre'} - faltan campos requeridos (id, name, ingredients, steps)`);
+          continue;
+        }
+
+        // Validate that ingredients array has proper structure
+        if (!Array.isArray(recipe.ingredients) || recipe.ingredients.length === 0) {
+          errors.push(`Receta "${recipe.name}": debe tener al menos un ingrediente`);
+          continue;
+        }
+
+        // Validate that each ingredient has required fields including ingredientId
+        const hasInvalidIngredients = recipe.ingredients.some((ing: any) =>
+          !ing.ingredientId || !ing.displayName || !ing.unit
+        );
+
+        if (hasInvalidIngredients) {
+          errors.push(`Receta "${recipe.name}": algunos ingredientes no tienen ingredientId, displayName o unit`);
           continue;
         }
 

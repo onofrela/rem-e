@@ -15,6 +15,11 @@ import {
   importRecipesFromJSON,
   initializeRecipesCache,
 } from '@/lib/db/services/recipeService';
+import {
+  exportAppliancesToJSON,
+  importAppliancesFromJSON,
+  initializeAppliancesCache,
+} from '@/lib/db/services/applianceService';
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -24,6 +29,7 @@ export default function SettingsPage() {
   // Refs for file inputs
   const glossaryInputRef = useRef<HTMLInputElement | null>(null);
   const recipesInputRef = useRef<HTMLInputElement | null>(null);
+  const appliancesInputRef = useRef<HTMLInputElement | null>(null);
 
   // ========== THEME HANDLERS ==========
   const handleThemeChange = (newTheme: 'green' | 'orange') => {
@@ -116,6 +122,52 @@ export default function SettingsPage() {
       }
 
       await initializeRecipesCache();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al importar el archivo');
+      setTimeout(() => setError(null), 3000);
+    }
+
+    event.target.value = '';
+  };
+
+  // ========== APPLIANCES HANDLERS ==========
+  const handleExportAppliances = async () => {
+    try {
+      const jsonData = await exportAppliancesToJSON();
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rem-e-electrodomesticos-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setSuccessMessage('Electrodomésticos exportados correctamente');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      setError('Error al exportar los electrodomésticos');
+      setTimeout(() => setError(null), 3000);
+    }
+  };
+
+  const handleImportAppliances = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const result = await importAppliancesFromJSON(text);
+
+      if (result.errors.length > 0) {
+        setError(`Importación con errores: ${result.errors.slice(0, 2).join(', ')}`);
+        setTimeout(() => setError(null), 5000);
+      } else {
+        setSuccessMessage(`Se importaron ${result.success} electrodomésticos correctamente`);
+        setTimeout(() => setSuccessMessage(null), 3000);
+      }
+
+      await initializeAppliancesCache();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al importar el archivo');
       setTimeout(() => setError(null), 3000);
@@ -277,8 +329,41 @@ export default function SettingsPage() {
             </p>
           </Card>
 
+          {/* Import/Export Appliances */}
+          <Card variant="elevated" padding="lg" className="animate-fadeInUp stagger-3">
+            <h2 className="text-lg sm:text-xl font-bold mb-2">🔌 Electrodomésticos</h2>
+            <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+              Exporta o importa el catálogo completo de electrodomésticos disponibles
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button variant="primary" size="md" onClick={handleExportAppliances} className="flex-1">
+                📥 Exportar Electrodomésticos
+              </Button>
+              <div className="flex-1">
+                <Button
+                  variant="ghost"
+                  size="md"
+                  fullWidth
+                  onClick={() => appliancesInputRef.current?.click()}
+                >
+                  📤 Importar Electrodomésticos
+                </Button>
+                <input
+                  ref={appliancesInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportAppliances}
+                  className="hidden"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-[var(--color-text-tertiary)] mt-3">
+              El archivo exportado incluye todos los electrodomésticos con sus especificaciones y alternativas
+            </p>
+          </Card>
+
           {/* About */}
-          <Card variant="elevated" padding="lg" className="text-center animate-fadeInUp stagger-3">
+          <Card variant="elevated" padding="lg" className="text-center animate-fadeInUp stagger-4">
             <div className="text-5xl sm:text-6xl mb-4">🍳</div>
             <h2 className="text-xl sm:text-2xl font-bold mb-2 text-[var(--color-primary)]">Rem-E</h2>
             <p className="text-xs sm:text-sm text-[var(--color-text-secondary)] mb-4">

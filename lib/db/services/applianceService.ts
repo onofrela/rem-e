@@ -298,7 +298,8 @@ export async function getApplianceCount(): Promise<number> {
 // =============================================================================
 
 /**
- * Export appliances to JSON with metadata
+ * Export appliances to JSON with IDs preserved
+ * IMPORTANT: IDs are included to maintain proper references
  */
 export async function exportAppliancesToJSON(): Promise<string> {
   const appliances = await getAllAppliances();
@@ -317,10 +318,13 @@ export async function exportAppliancesToJSON(): Promise<string> {
 
 /**
  * Import appliances from JSON
+ * IMPORTANT: Preserves IDs from the JSON to maintain references
+ * @param jsonData - JSON string with appliances array
+ * @param clearExisting - If true, clears existing appliances before import
  */
 export async function importAppliancesFromJSON(
   jsonData: string,
-  clearExisting: boolean = false
+  clearExisting: boolean = true
 ): Promise<{ success: number; errors: string[] }> {
   const errors: string[] = [];
 
@@ -328,19 +332,31 @@ export async function importAppliancesFromJSON(
     const data: AppliancesDatabase = JSON.parse(jsonData);
 
     if (!data.appliances || !Array.isArray(data.appliances)) {
-      throw new Error('Invalid JSON format: missing or invalid appliances array');
+      throw new Error('Formato JSON inválido: debe contener un array "appliances"');
+    }
+
+    // Validate that appliances have required fields including ID
+    for (let i = 0; i < data.appliances.length; i++) {
+      const app = data.appliances[i];
+      if (!app.id || !app.name || !app.category) {
+        errors.push(`Electrodoméstico ${i + 1}: falta id, name o category`);
+      }
     }
 
     if (clearExisting) {
       await clearStore(STORES.APPLIANCES_CACHE);
+      appliancesData = null; // Clear memory cache
     }
 
     const success = await bulkAdd(STORES.APPLIANCES_CACHE, data.appliances);
-    appliancesData = null; // Clear memory cache
 
     return { success, errors };
   } catch (error) {
-    errors.push(error instanceof Error ? error.message : 'Unknown error');
+    if (error instanceof SyntaxError) {
+      errors.push('El archivo no es un JSON válido');
+    } else {
+      errors.push(error instanceof Error ? error.message : 'Error desconocido');
+    }
     return { success: 0, errors };
   }
 }
