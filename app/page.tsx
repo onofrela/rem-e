@@ -1,14 +1,52 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { MainLayout } from '@/components/layout';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { mockRecipes } from '@/lib/utils/mock-data';
+import type { Recipe } from '@/lib/db/schemas/types';
+import * as recipeService from '@/lib/db/services/recipeService';
+import { getDailyRecommendation } from '@/lib/db/services/recommendationService';
+
+const getCurrentTip = (tips: readonly string[]): string => {
+  const today = new Date();
+
+  // Calcular el día del año
+  const startOfYear = new Date(today.getFullYear(), 0, 0);
+  const diff = today.getTime() - startOfYear.getTime();
+  const oneDay = 1000 * 60 * 60 * 24;
+  const dayOfYear = Math.floor(diff / oneDay);
+
+  // Usar el operador módulo (%) para la rotación
+  const tipIndex = dayOfYear % tips.length;
+
+  return tips[tipIndex];
+};
 
 export default function Home() {
+  const [suggestionOfTheDay, setSuggestionOfTheDay] = useState<Recipe | null>(null);
+  const todayTip = getCurrentTip(require('@/lib/utils/daily-tips').dailyTips);
+
+  useEffect(() => {
+    const loadSuggestion = async () => {
+      // Try to get personalized recommendation
+      const recommendation = await getDailyRecommendation();
+
+      if (recommendation) {
+        setSuggestionOfTheDay(recommendation.recipe);
+      } else {
+        // Fallback: show first recipe if recommendation fails
+        const recipes = await recipeService.getAllRecipes();
+        if (recipes.length > 0) {
+          setSuggestionOfTheDay(recipes[0]);
+        }
+      }
+    };
+    loadSuggestion();
+  }, []);
+
   const currentHour = new Date().getHours();
   const greeting =
     currentHour < 12
@@ -16,8 +54,6 @@ export default function Home() {
       : currentHour < 18
       ? '¡Buenas tardes!'
       : '¡Buenas noches!';
-
-  const suggestionOfTheDay = mockRecipes[0];
 
   return (
     <MainLayout>
@@ -60,31 +96,32 @@ export default function Home() {
             </Link>
 
             {/* Suggestion of the Day - 2x1 tile */}
-            <Link href={`/recipes/${suggestionOfTheDay.id}`} className="col-span-2 row-span-1">
-              <Card variant="elevated" padding="none" hoverable className="h-full animate-fadeInUp stagger-5 overflow-hidden flex flex-row">
-                {/* Recipe Info */}
-                <div className="p-4 md:p-6 flex flex-col justify-between flex-1">
-                  <div>
-                    <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
-                      <span className="text-2xl md:text-3xl lg:text-4xl">💡</span>
-                      <span className="text-sm md:text-base lg:text-lg font-semibold text-gray-600">
-                        Sugerencia del día
-                      </span>
+            {suggestionOfTheDay && (
+              <Link href={`/recipes/${suggestionOfTheDay.id}`} className="col-span-2 row-span-1">
+                <Card variant="elevated" padding="none" hoverable className="h-full animate-fadeInUp stagger-5 overflow-hidden flex flex-row">
+                  {/* Recipe Info */}
+                  <div className="p-4 md:p-6 flex flex-col justify-between flex-1">
+                    <div>
+                      <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                        <span className="text-2xl md:text-3xl lg:text-4xl">💡</span>
+                        <span className="text-sm md:text-base lg:text-lg font-semibold text-gray-600">
+                          Sugerencia del día
+                        </span>
+                      </div>
+                      <h4 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-800 mb-2 md:mb-3">
+                        {suggestionOfTheDay.name}
+                      </h4>
+                      <p className="text-sm md:text-base lg:text-lg text-gray-600 mb-3 md:mb-4 line-clamp-2">
+                        {suggestionOfTheDay.description}
+                      </p>
                     </div>
-                    <h4 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-800 mb-2 md:mb-3">
-                      {suggestionOfTheDay.name}
-                    </h4>
-                    <p className="text-sm md:text-base lg:text-lg text-gray-600 mb-3 md:mb-4 line-clamp-2">
-                      {suggestionOfTheDay.description}
-                    </p>
-                  </div>
 
-                  <div className="flex flex-wrap gap-2 md:gap-3">
-                    <Badge variant="default" className="text-xs md:text-sm lg:text-base">
-                      ⏱ {suggestionOfTheDay.time}m
-                    </Badge>
-                    <Badge variant="success" className="text-xs md:text-sm lg:text-base">
-                      👨‍🍳 {suggestionOfTheDay.difficulty}
+                    <div className="flex flex-wrap gap-2 md:gap-3">
+                      <Badge variant="default" className="text-xs md:text-sm lg:text-base">
+                        ⏱ {suggestionOfTheDay.time}m
+                      </Badge>
+                      <Badge variant="success" className="text-xs md:text-sm lg:text-base">
+                        👨‍🍳 {suggestionOfTheDay.difficulty}
                     </Badge>
                     <Badge variant="info" className="text-xs md:text-sm lg:text-base">
                       🍴 {suggestionOfTheDay.servings}
@@ -98,6 +135,7 @@ export default function Home() {
                 </div>
               </Card>
             </Link>
+            )}
 
             {/* Tip of the Day - 2x1 wide tile */}
             <div className="col-span-2 row-span-1">
@@ -109,8 +147,7 @@ export default function Home() {
                       Consejo de hoy
                     </h4>
                     <p className="text-sm md:text-base lg:text-lg text-gray-600 line-clamp-2">
-                      El ajo y la cebolla son la base de muchos platillos. Siempre
-                      ten algunos a la mano para dar sabor a tus comidas.
+                      {todayTip}
                     </p>
                   </div>
                 </div>

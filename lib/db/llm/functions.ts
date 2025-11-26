@@ -519,6 +519,134 @@ export const llmFunctions: FunctionDefinition[] = [
       required: ['recipeId', 'stepNumber'],
     },
   },
+  // ==========================================================================
+  // APPLIANCE ADAPTATION FUNCTIONS
+  // ==========================================================================
+  {
+    name: 'checkStepAppliances',
+    description: 'Verifica si el usuario tiene los electrodomésticos necesarios para un paso específico de la receta ANTES de ejecutarlo.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recipeId: {
+          type: 'string',
+          description: 'ID de la receta actual',
+        },
+        stepNumber: {
+          type: 'number',
+          description: 'Número del paso a verificar',
+        },
+      },
+      required: ['recipeId', 'stepNumber'],
+    },
+  },
+  {
+    name: 'adaptStepForMissingAppliance',
+    description: 'Adapta las instrucciones de un paso cuando el usuario NO tiene el electrodoméstico requerido. Genera instrucciones alternativas. NO crea variante.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recipeId: {
+          type: 'string',
+          description: 'ID de la receta',
+        },
+        stepNumber: {
+          type: 'number',
+          description: 'Número del paso a adaptar',
+        },
+        missingApplianceId: {
+          type: 'string',
+          description: 'ID del electrodoméstico que falta',
+        },
+        originalInstruction: {
+          type: 'string',
+          description: 'Instrucción original del paso',
+        },
+        userAppliances: {
+          type: 'array',
+          description: 'IDs de electrodomésticos que el usuario SÍ tiene',
+          items: { type: 'string' },
+        },
+      },
+      required: ['recipeId', 'stepNumber', 'missingApplianceId', 'originalInstruction', 'userAppliances'],
+    },
+  },
+  {
+    name: 'addApplianceToKitchen',
+    description: 'Agrega un electrodoméstico a Mi Cocina después de que el usuario confirma que lo tiene.',
+    parameters: {
+      type: 'object',
+      properties: {
+        applianceId: {
+          type: 'string',
+          description: 'ID del electrodoméstico del catálogo',
+        },
+      },
+      required: ['applianceId'],
+    },
+  },
+  {
+    name: 'recordApplianceAdaptation',
+    description: 'Registra el uso de una adaptación para aprendizaje automático.',
+    parameters: {
+      type: 'object',
+      properties: {
+        originalApplianceId: {
+          type: 'string',
+          description: 'ID del electrodoméstico original',
+        },
+        alternativeApplianceId: {
+          type: 'string',
+          description: 'ID del electrodoméstico alternativo usado',
+        },
+        stepNumber: {
+          type: 'number',
+          description: 'Número del paso',
+        },
+        recipeId: {
+          type: 'string',
+          description: 'ID de la receta',
+        },
+        successful: {
+          type: 'boolean',
+          description: 'Si funcionó bien (default: true)',
+        },
+        notes: {
+          type: 'string',
+          description: 'Notas opcionales',
+        },
+      },
+      required: ['originalApplianceId', 'alternativeApplianceId', 'stepNumber', 'recipeId'],
+    },
+  },
+
+  // ==========================================================================
+  // MEAL PLANNING FUNCTIONS
+  // ==========================================================================
+  {
+    name: 'generateWeeklyMealPlan',
+    description: 'Genera un plan semanal de comidas basado en las preferencias del usuario y recetas disponibles. Responde SOLO con JSON estructurado, NO con texto natural.',
+    parameters: {
+      type: 'object',
+      properties: {
+        userPrompt: {
+          type: 'string',
+          description: 'Instrucciones del usuario en lenguaje natural sobre cómo quiere su plan semanal',
+        },
+        availableRecipes: {
+          type: 'array',
+          description: 'Lista minimalista de recetas: {id, name, ingredients[], stepCount, calories, difficulty, time, tags}',
+          items: { type: 'object' },
+        },
+        userInventory: {
+          type: 'array',
+          description: 'IDs de ingredientes disponibles en el inventario del usuario',
+          items: { type: 'string' },
+        },
+      },
+      required: ['userPrompt', 'availableRecipes'],
+    },
+  },
 ];
 
 /**

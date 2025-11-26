@@ -30,55 +30,49 @@ import {
 // DATA LOADING
 // =============================================================================
 
-let appliancesData: CatalogAppliance[] | null = null;
-
 /**
- * Load appliances from JSON file
+ * IMPORTANT: This service uses ONLY IndexedDB as the source of truth.
+ * There are NO JSON fallbacks. All data must be in IndexedDB.
+ * Use import/export functions to manage appliances data.
  */
-async function loadAppliancesFromJSON(): Promise<CatalogAppliance[]> {
-  if (appliancesData) {
-    return appliancesData;
-  }
-
-  try {
-    // Fetch from public directory
-    const response = await fetch('/data/appliances.json');
-    if (!response.ok) {
-      throw new Error('Failed to load appliances.json');
-    }
-
-    const data: AppliancesDatabase = await response.json();
-    appliancesData = data.appliances;
-    return appliancesData!;
-  } catch (error) {
-    console.error('Error loading appliances:', error);
-    return [];
-  }
-}
 
 /**
  * Initialize appliances cache in IndexedDB
+ * Note: This only checks if the store exists. Data must be imported separately.
  */
 export async function initializeAppliancesCache(): Promise<void> {
   const existingCount = await countItems(STORES.APPLIANCES_CACHE);
 
   if (existingCount === 0) {
-    const appliances = await loadAppliancesFromJSON();
-    await bulkAdd(STORES.APPLIANCES_CACHE, appliances);
-    console.log(`Initialized ${appliances.length} appliances in cache`);
+    console.warn('⚠️ No appliances found in IndexedDB. Please import appliances data.');
+  } else {
+    console.log(`Found ${existingCount} appliances in IndexedDB`);
   }
 }
 
 /**
- * Force refresh the appliances cache
+ * Clear all appliances from IndexedDB
+ * WARNING: This will DELETE ALL APPLIANCES!
+ * Only use this when resetting the database or before importing new data.
+ */
+export async function clearAllAppliances(): Promise<void> {
+  await clearStore(STORES.APPLIANCES_CACHE);
+  console.warn('⚠️ All appliances have been cleared from IndexedDB.');
+}
+
+/**
+ * @deprecated This function has been removed. IndexedDB is the only source of truth.
+ * To reset appliances, export your current data first, then use clearAllAppliances() and importAppliancesFromJSON().
+ */
+export async function resetAppliancesToDefaults(): Promise<number> {
+  throw new Error('resetAppliancesToDefaults() has been removed. Use clearAllAppliances() and importAppliancesFromJSON() instead.');
+}
+
+/**
+ * @deprecated This function has been removed. IndexedDB is the only source of truth.
  */
 export async function refreshAppliancesCache(): Promise<number> {
-  await clearStore(STORES.APPLIANCES_CACHE);
-  appliancesData = null;
-
-  const appliances = await loadAppliancesFromJSON();
-  await bulkAdd(STORES.APPLIANCES_CACHE, appliances);
-  return appliances.length;
+  throw new Error('refreshAppliancesCache() has been removed. IndexedDB is the only source of truth.');
 }
 
 // =============================================================================
@@ -86,17 +80,10 @@ export async function refreshAppliancesCache(): Promise<number> {
 // =============================================================================
 
 /**
- * Get all appliances from cache or JSON
+ * Get all appliances from IndexedDB
+ * IMPORTANT: This only reads from IndexedDB. No JSON fallback.
  */
 export async function getAllAppliances(): Promise<CatalogAppliance[]> {
-  // Try cache first
-  const cached = await getAllItems<CatalogAppliance>(STORES.APPLIANCES_CACHE);
-  if (cached.length > 0) {
-    return cached;
-  }
-
-  // Fallback to JSON and initialize cache
-  await initializeAppliancesCache();
   return getAllItems<CatalogAppliance>(STORES.APPLIANCES_CACHE);
 }
 
@@ -104,15 +91,14 @@ export async function getAllAppliances(): Promise<CatalogAppliance[]> {
  * Get a single appliance by ID
  */
 export async function getApplianceById(id: string): Promise<CatalogAppliance | null> {
-  // Try cache first
+  // Get from IndexedDB - the single source of truth
   const cached = await getItem<CatalogAppliance>(STORES.APPLIANCES_CACHE, id);
   if (cached) {
     return cached;
   }
 
-  // Fallback to JSON search
-  const all = await loadAppliancesFromJSON();
-  return all.find(app => app.id === id) || null;
+  // If not in cache, it doesn't exist (cache should always be initialized)
+  return null;
 }
 
 /**
@@ -298,22 +284,19 @@ export async function getApplianceCount(): Promise<number> {
 // =============================================================================
 
 /**
+ * IMPORTANT: Import/Export functionality has been moved to RemEDatabase class.
+ * These functions now delegate to the centralized database manager.
+ * DO NOT add new import/export logic here - use RemEDatabase instead.
+ */
+
+import { db } from '../RemEDatabase';
+
+/**
  * Export appliances to JSON with IDs preserved
  * IMPORTANT: IDs are included to maintain proper references
  */
 export async function exportAppliancesToJSON(): Promise<string> {
-  const appliances = await getAllAppliances();
-
-  const data: AppliancesDatabase = {
-    metadata: {
-      version: '1.0.0',
-      lastUpdated: new Date().toISOString(),
-      itemCount: appliances.length
-    },
-    appliances
-  };
-
-  return JSON.stringify(data, null, 2);
+  return db.exportAppliances();
 }
 
 /**
@@ -326,39 +309,7 @@ export async function importAppliancesFromJSON(
   jsonData: string,
   clearExisting: boolean = true
 ): Promise<{ success: number; errors: string[] }> {
-  const errors: string[] = [];
-
-  try {
-    const data: AppliancesDatabase = JSON.parse(jsonData);
-
-    if (!data.appliances || !Array.isArray(data.appliances)) {
-      throw new Error('Formato JSON inválido: debe contener un array "appliances"');
-    }
-
-    // Validate that appliances have required fields including ID
-    for (let i = 0; i < data.appliances.length; i++) {
-      const app = data.appliances[i];
-      if (!app.id || !app.name || !app.category) {
-        errors.push(`Electrodoméstico ${i + 1}: falta id, name o category`);
-      }
-    }
-
-    if (clearExisting) {
-      await clearStore(STORES.APPLIANCES_CACHE);
-      appliancesData = null; // Clear memory cache
-    }
-
-    const success = await bulkAdd(STORES.APPLIANCES_CACHE, data.appliances);
-
-    return { success, errors };
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      errors.push('El archivo no es un JSON válido');
-    } else {
-      errors.push(error instanceof Error ? error.message : 'Error desconocido');
-    }
-    return { success: 0, errors };
-  }
+  return db.importAppliances(jsonData, clearExisting);
 }
 
 /**
@@ -378,4 +329,73 @@ export async function getAppliancesSummary(): Promise<{
     common,
     categories
   };
+}
+
+// =============================================================================
+// FUNCTIONALITY-BASED SEARCH
+// =============================================================================
+
+/**
+ * Get all appliances that can perform a specific functionality
+ * @param functionality - The functionality to search for (e.g., "stovetop_cooking")
+ * @returns Array of appliances that support this functionality
+ */
+export async function getAppliancesByFunctionality(
+  functionality: string
+): Promise<CatalogAppliance[]> {
+  const allAppliances = await getAllAppliances();
+  return allAppliances.filter(app =>
+    app.functionalities && app.functionalities.includes(functionality as any)
+  );
+}
+
+/**
+ * Check if user has any appliance that can perform a specific functionality
+ * @param functionality - The functionality needed (e.g., "stovetop_cooking")
+ * @param userApplianceIds - Array of appliance IDs that the user owns
+ * @returns Object with hasCapability boolean and matching appliances
+ */
+export async function checkUserHasFunctionality(
+  functionality: string,
+  userApplianceIds: string[]
+): Promise<{
+  hasCapability: boolean;
+  matchingAppliances: CatalogAppliance[];
+}> {
+  const allAppliances = await getAllAppliances();
+
+  // Find appliances that user owns and support this functionality
+  const matchingAppliances = allAppliances.filter(app =>
+    userApplianceIds.includes(app.id) &&
+    app.functionalities &&
+    app.functionalities.includes(functionality as any)
+  );
+
+  return {
+    hasCapability: matchingAppliances.length > 0,
+    matchingAppliances
+  };
+}
+
+/**
+ * Resolve an appliance ID or functionality to actual appliance(s)
+ * This allows recipes to use either specific appliance IDs or generic functionalities
+ * @param idOrFunctionality - Can be an appliance ID (e.g., "stovetop_gas") or functionality (e.g., "stovetop_cooking")
+ * @returns Array of appliances that match
+ */
+export async function resolveApplianceOrFunctionality(
+  idOrFunctionality: string
+): Promise<CatalogAppliance[]> {
+  const allAppliances = await getAllAppliances();
+
+  // First, try to find by ID (exact match)
+  const exactMatch = allAppliances.find(app => app.id === idOrFunctionality);
+  if (exactMatch) {
+    return [exactMatch];
+  }
+
+  // If not found, treat as functionality and find all appliances with that functionality
+  return allAppliances.filter(app =>
+    app.functionalities && app.functionalities.includes(idOrFunctionality as any)
+  );
 }

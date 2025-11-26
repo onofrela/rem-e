@@ -131,6 +131,7 @@ export interface RecipeStep {
   instruction: string;                  // What to do
   duration?: number;                    // Minutes for this step
   ingredientsUsed: string[];            // IDs of ingredients used in this step
+  appliancesUsed?: string[];            // IDs of appliances OR functionalities (e.g., "stovetop_gas" or "stovetop_cooking")
   tip?: string;                         // Helpful tip
   warning?: string;                     // Safety warning
 }
@@ -303,6 +304,58 @@ export type ApplianceSubcategory =
   | 'Otro';
 
 /**
+ * Appliance functionality types
+ * Represents what an appliance can DO rather than what it IS
+ * Multiple appliances can share the same functionality
+ */
+export type ApplianceFunctionality =
+  // Heat source functions
+  | 'stovetop_cooking'        // Cocinar en estufa/parrilla (gas, eléctrica, inducción)
+  | 'oven_baking'             // Hornear (horno de gas, eléctrico, convección)
+  | 'microwave_heating'       // Calentar en microondas
+  | 'grilling'                // Asar a la parrilla (grill, asador, plancha)
+  | 'deep_frying'             // Freír por inmersión (freidora, olla)
+  | 'air_frying'              // Freír con aire
+  | 'slow_cooking'            // Cocción lenta (olla de cocción lenta, instant pot)
+  | 'pressure_cooking'        // Cocción a presión
+  | 'steaming'                // Cocinar al vapor
+  | 'toasting'                // Tostar (tostador, horno)
+
+  // Blending/mixing functions
+  | 'blending'                // Licuar (licuadora, procesador)
+  | 'food_processing'         // Procesar alimentos (procesador, picadora)
+  | 'mixing'                  // Mezclar (batidora manual, de pie)
+  | 'whisking'                // Batir (batidora de globo, eléctrica)
+  | 'grinding'                // Moler (molinillo, procesador)
+  | 'chopping'                // Picar (picadora, procesador)
+  | 'grating'                 // Rallar (rallador manual, eléctrico)
+  | 'juicing'                 // Exprimir jugos
+
+  // Temperature control
+  | 'refrigerating'           // Refrigerar
+  | 'freezing'                // Congelar
+  | 'cooling'                 // Enfriar
+  | 'warming'                 // Mantener caliente
+
+  // Measuring
+  | 'weighing'                // Pesar (báscula)
+  | 'measuring_temperature'   // Medir temperatura (termómetro)
+  | 'timing'                  // Cronometrar (temporizador)
+
+  // Beverage preparation
+  | 'brewing_coffee'          // Preparar café
+  | 'boiling_water'           // Hervir agua (tetera, calentador)
+
+  // Preservation
+  | 'vacuum_sealing'          // Sellar al vacío
+  | 'dehydrating'             // Deshidratar
+  | 'fermenting'              // Fermentar
+
+  // Other
+  | 'dishwashing'             // Lavar trastes
+  | 'bread_making';           // Hacer pan (panificadora)
+
+/**
  * Technical specifications for an appliance
  */
 export interface ApplianceSpecifications {
@@ -322,12 +375,15 @@ export interface ApplianceSpecifications {
  * Master appliance in the catalog (appliances.json)
  */
 export interface CatalogAppliance {
-  id: string;                           // e.g., "app_001"
+  id: string;                           // e.g., "stovetop_gas"
   name: string;                         // Display name: "Horno eléctrico"
   normalizedName: string;               // For search: "horno"
   category: ApplianceCategory;
   subcategory: ApplianceSubcategory;
   synonyms: string[];                   // ["horno", "oven", "horno eléctrico"]
+
+  // NEW: Functionalities this appliance can perform
+  functionalities: ApplianceFunctionality[];  // ["oven_baking", "toasting"]
 
   specifications: ApplianceSpecifications;
   useCases: string[];                   // ["Hornear", "Rostizar", "Gratinar"]
@@ -979,4 +1035,240 @@ export interface AdaptRecipeParams {
   missingAppliances?: string[];   // Appliances user doesn't have
   dietaryRestrictions?: string[]; // e.g., ["vegetarian", "gluten-free"]
   servings?: number;              // Adjust serving size
+}
+
+// =============================================================================
+// APPLIANCE ADAPTATION TYPES
+// =============================================================================
+
+/**
+ * Contextual factors affecting appliance adaptation viability
+ */
+export interface ApplianceAdaptationContext {
+  recipeTypes: string[];          // e.g., ["horneado", "asado", "frito"]
+  cookingMethods: string[];       // e.g., ["alta temperatura", "cocción lenta"]
+  stepTypes: string[];            // e.g., ["precalentamiento", "cocción principal"]
+}
+
+/**
+ * Impact analysis of appliance adaptation
+ */
+export interface ApplianceAdaptationImpact {
+  technique?: string;             // e.g., "Cocción más lenta"
+  timing?: string;                // e.g., "Requiere más tiempo"
+  quality?: string;               // e.g., "Resultado similar"
+  difficulty?: string;            // e.g., "Más complejo"
+}
+
+/**
+ * Adjustments needed when adapting to alternative appliance
+ */
+export interface ApplianceAdaptationAdjustments {
+  newInstruction: string;         // Complete rewritten step instruction
+  timing?: {
+    adjustment: number;           // minutes +/-
+    reason: string;
+  };
+  temperature?: {
+    adjustment: number;           // degrees +/-
+    reason: string;
+  };
+  additionalSteps?: string[];
+  warnings?: string[];
+}
+
+/**
+ * Complete appliance adaptation (parallel to IngredientSubstitution)
+ */
+export interface ApplianceAdaptation {
+  id: string;
+  originalApplianceId: string;
+  alternativeApplianceId: string;
+  confidence: number;             // 0-1
+
+  contextualFactors: ApplianceAdaptationContext;
+  impact: ApplianceAdaptationImpact;
+  adjustments: ApplianceAdaptationAdjustments;
+
+  reason: string;
+  difficultyIncrease: 'none' | 'slight' | 'moderate' | 'significant';
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * User's learned preference for appliance adaptations
+ */
+export interface UserApplianceAdaptationPreference {
+  id: string;
+  userId?: string;
+  originalApplianceId: string;
+  preferredAlternativeId: string;
+
+  timesUsed: number;
+  successRate: number;
+  lastUsedAt: string;
+
+  contexts: string[];
+  notes?: string;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Runtime adaptation state (NOT persisted as variant)
+ */
+export interface StepAdaptation {
+  stepNumber: number;
+  originalAppliance: string;
+  alternativeAppliance: string;
+  adaptedInstruction: string;
+  confidence: number;
+  impact: ApplianceAdaptationImpact;
+  warnings?: string[];
+  timingAdjustment?: number;
+  temperatureAdjustment?: number;
+  timestamp: string;
+}
+
+// =============================================================================
+// LLM FUNCTION PARAMETER TYPES - APPLIANCE ADAPTATION
+// =============================================================================
+
+/**
+ * Parameters for checking appliances in a step
+ */
+export interface CheckApplianceParams {
+  recipeId: string;
+  stepNumber: number;
+}
+
+/**
+ * Parameters for adapting a step when appliance is missing
+ */
+export interface AdaptStepForApplianceParams {
+  recipeId: string;
+  stepNumber: number;
+  missingApplianceId: string;
+  originalInstruction: string;
+  userAppliances: string[];
+}
+
+/**
+ * Parameters for recording appliance adaptation usage
+ */
+export interface RecordApplianceAdaptationParams {
+  originalApplianceId: string;
+  alternativeApplianceId: string;
+  stepNumber: number;
+  recipeId: string;
+  successful: boolean;
+  notes?: string;
+}
+
+// =============================================================================
+// MEAL PLANNING TYPES
+// =============================================================================
+
+/**
+ * Estructura de comidas para un día
+ */
+export interface DailyMeals {
+  desayuno: string | null;  // recipeId or null
+  almuerzo: string | null;
+  comida: string | null;
+  cena: string | null;
+}
+
+/**
+ * Estructura de comidas para toda la semana
+ */
+export interface WeeklyMeals {
+  lunes: DailyMeals;
+  martes: DailyMeals;
+  miercoles: DailyMeals;
+  jueves: DailyMeals;
+  viernes: DailyMeals;
+  sabado: DailyMeals;
+  domingo: DailyMeals;
+}
+
+/**
+ * Plan de comidas semanal completo
+ */
+export interface MealPlan {
+  id: string;
+  name: string;  // "Plan del 26 Nov - 2 Dic"
+  startDate: string;  // ISO date (YYYY-MM-DD)
+  endDate: string;    // ISO date (YYYY-MM-DD)
+  meals: WeeklyMeals;
+  generatedBy: 'questionnaire' | 'llm';
+  metadata?: {
+    goals?: string[];
+    dietaryRestrictions?: string[];
+    peopleCount?: number;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Preferencias de planificación del usuario
+ */
+export interface UserPlanningPreferences {
+  id: string;  // Always 'planning_preferences' (singleton)
+  goals: string[];  // ['weight_loss', 'muscle_gain', 'maintenance', 'family']
+  dietaryRestrictions: string[];  // ['vegetarian', 'vegan', 'gluten_free', 'dairy_free']
+  peopleCount: number;
+  skillLevel: 'beginner' | 'intermediate' | 'advanced';
+  timeAvailable: 'low' | 'medium' | 'high';  // < 30min, 30-60min, > 60min
+  preferredCuisines: string[];
+  updatedAt: string;
+}
+
+/**
+ * Respuestas del cuestionario de planificación
+ */
+export interface QuestionnaireAnswers {
+  goals: string[];
+  dietaryRestrictions: string[];
+  peopleCount: number;
+  skillLevel: 'beginner' | 'intermediate' | 'advanced';
+  timeAvailable: 'low' | 'medium' | 'high';
+  preferredCuisines?: string[];
+}
+
+// =============================================================================
+// RECOMMENDATION SYSTEM TYPES
+// =============================================================================
+
+/**
+ * Factores de scoring para recomendaciones
+ */
+export interface RecommendationFactors {
+  inventoryMatchScore: number;  // 0-1
+  ratingScore: number;           // 0-1
+  frequencyScore: number;        // 0-1
+  finalScore: number;            // weighted average
+}
+
+/**
+ * Cache de recomendación diaria
+ */
+export interface RecommendationCache {
+  id: string;  // Always 'daily_recommendation' (singleton)
+  recipeId: string;
+  score: number;
+  factors: RecommendationFactors;
+  generatedAt: string;  // ISO timestamp
+}
+
+/**
+ * Resultado de recomendación con receta completa
+ */
+export interface RecommendationResult {
+  recipe: Recipe;
+  factors: RecommendationFactors;
 }

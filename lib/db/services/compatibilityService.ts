@@ -19,39 +19,31 @@ import { getIngredientById, getIngredientsByIds } from './ingredientService';
 // DATA LOADING
 // =============================================================================
 
+/**
+ * IMPORTANT: Compatibility data is optional and not stored in IndexedDB.
+ * The app will use ingredient.compatibleWith arrays as fallback.
+ * Future implementation could store this in IndexedDB if needed.
+ */
+
 let compatibilityData: CompatibilityData | null = null;
 
 /**
- * Load compatibility data from JSON file
+ * Get compatibility data (returns empty data structure)
+ * NOTE: This feature is currently disabled. The app uses ingredient.compatibleWith arrays instead.
  */
 async function loadCompatibilityData(): Promise<CompatibilityData> {
   if (compatibilityData) {
     return compatibilityData;
   }
 
-  try {
-    const response = await fetch('/lib/db/data/compatibility.json');
-    if (!response.ok) {
-      throw new Error('Failed to load compatibility.json');
-    }
+  // Return empty compatibility data - use ingredient.compatibleWith instead
+  compatibilityData = {
+    version: '1.0.0',
+    compatibilityPairs: [],
+    flavorProfiles: {},
+  };
 
-    compatibilityData = await response.json();
-    return compatibilityData!;
-  } catch (error) {
-    console.error('Error loading compatibility data:', error);
-    // Fallback: try to import directly (for development)
-    try {
-      const module = await import('../data/compatibility.json');
-      compatibilityData = module as unknown as CompatibilityData;
-      return compatibilityData!;
-    } catch {
-      return {
-        version: '1.0.0',
-        compatibilityPairs: [],
-        flavorProfiles: {},
-      };
-    }
-  }
+  return compatibilityData;
 }
 
 // =============================================================================

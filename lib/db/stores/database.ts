@@ -19,7 +19,12 @@ import type {
   UserSubstitutionPreference,
   RecipeVariant,
   RecipeHistory,
-  UserKnowledgeEntry
+  UserKnowledgeEntry,
+  ApplianceAdaptation,
+  UserApplianceAdaptationPreference,
+  MealPlan,
+  UserPlanningPreferences,
+  RecommendationCache
 } from '../schemas/types';
 
 // =============================================================================
@@ -27,7 +32,7 @@ import type {
 // =============================================================================
 
 const DB_NAME = 'RemEDatabase';
-const DB_VERSION = 5; // Increment when schema changes (added substitutions, variants, history, knowledge)
+const DB_VERSION = 7; // Increment when schema changes (added meal planning + recommendations)
 
 // Store names
 export const STORES = {
@@ -45,6 +50,15 @@ export const STORES = {
   RECIPE_VARIANTS: 'recipeVariants',
   RECIPE_HISTORY: 'recipeHistory',
   USER_KNOWLEDGE: 'userKnowledge',
+
+  // Appliance adaptation stores
+  APPLIANCE_ADAPTATIONS: 'applianceAdaptations',
+  USER_APPLIANCE_ADAPTATION_PREFS: 'userApplianceAdaptationPrefs',
+
+  // Meal planning and recommendation stores
+  MEAL_PLANS: 'mealPlans',
+  USER_PLANNING_PREFERENCES: 'userPlanningPreferences',
+  RECOMMENDATION_CACHE: 'recommendationCache',
 } as const;
 
 // =============================================================================
@@ -184,6 +198,45 @@ export function openDatabase(): Promise<IDBDatabase> {
         knowledgeStore.createIndex('timesApplied', 'timesApplied', { unique: false });
         knowledgeStore.createIndex('lastAppliedAt', 'lastAppliedAt', { unique: false });
         knowledgeStore.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+
+      // Create Appliance Adaptations store
+      if (!db.objectStoreNames.contains(STORES.APPLIANCE_ADAPTATIONS)) {
+        const adaptationsStore = db.createObjectStore(STORES.APPLIANCE_ADAPTATIONS, { keyPath: 'id' });
+        adaptationsStore.createIndex('originalApplianceId', 'originalApplianceId', { unique: false });
+        adaptationsStore.createIndex('alternativeApplianceId', 'alternativeApplianceId', { unique: false });
+        adaptationsStore.createIndex('confidence', 'confidence', { unique: false });
+        // Compound index for efficient lookups
+        adaptationsStore.createIndex('adaptationPair', ['originalApplianceId', 'alternativeApplianceId'], { unique: false });
+      }
+
+      // Create User Appliance Adaptation Preferences store
+      if (!db.objectStoreNames.contains(STORES.USER_APPLIANCE_ADAPTATION_PREFS)) {
+        const userAppAdaptsStore = db.createObjectStore(STORES.USER_APPLIANCE_ADAPTATION_PREFS, { keyPath: 'id' });
+        userAppAdaptsStore.createIndex('originalApplianceId', 'originalApplianceId', { unique: false });
+        userAppAdaptsStore.createIndex('preferredAlternativeId', 'preferredAlternativeId', { unique: false });
+        userAppAdaptsStore.createIndex('timesUsed', 'timesUsed', { unique: false });
+        userAppAdaptsStore.createIndex('lastUsedAt', 'lastUsedAt', { unique: false });
+      }
+
+      // Create Meal Plans store
+      if (!db.objectStoreNames.contains(STORES.MEAL_PLANS)) {
+        const mealPlansStore = db.createObjectStore(STORES.MEAL_PLANS, { keyPath: 'id' });
+        mealPlansStore.createIndex('startDate', 'startDate', { unique: false });
+        mealPlansStore.createIndex('endDate', 'endDate', { unique: false });
+        mealPlansStore.createIndex('generatedBy', 'generatedBy', { unique: false });
+        mealPlansStore.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+
+      // Create User Planning Preferences store
+      if (!db.objectStoreNames.contains(STORES.USER_PLANNING_PREFERENCES)) {
+        const prefsStore = db.createObjectStore(STORES.USER_PLANNING_PREFERENCES, { keyPath: 'id' });
+        prefsStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+      }
+
+      // Create Recommendation Cache store (singleton)
+      if (!db.objectStoreNames.contains(STORES.RECOMMENDATION_CACHE)) {
+        db.createObjectStore(STORES.RECOMMENDATION_CACHE, { keyPath: 'id' });
       }
     };
   });
@@ -569,6 +622,11 @@ export async function getDatabaseStats(): Promise<{
   recipeVariantsCount: number;
   recipeHistoryCount: number;
   userKnowledgeCount: number;
+  applianceAdaptationsCount: number;
+  userApplianceAdaptationPrefsCount: number;
+  mealPlansCount: number;
+  userPlanningPreferencesCount: number;
+  recommendationCacheCount: number;
 }> {
   const [
     inventoryCount,
@@ -581,7 +639,12 @@ export async function getDatabaseStats(): Promise<{
     userSubstitutionPrefsCount,
     recipeVariantsCount,
     recipeHistoryCount,
-    userKnowledgeCount
+    userKnowledgeCount,
+    applianceAdaptationsCount,
+    userApplianceAdaptationPrefsCount,
+    mealPlansCount,
+    userPlanningPreferencesCount,
+    recommendationCacheCount
   ] = await Promise.all([
     countItems(STORES.INVENTORY),
     countItems(STORES.INGREDIENTS_CACHE),
@@ -594,6 +657,11 @@ export async function getDatabaseStats(): Promise<{
     countItems(STORES.RECIPE_VARIANTS),
     countItems(STORES.RECIPE_HISTORY),
     countItems(STORES.USER_KNOWLEDGE),
+    countItems(STORES.APPLIANCE_ADAPTATIONS),
+    countItems(STORES.USER_APPLIANCE_ADAPTATION_PREFS),
+    countItems(STORES.MEAL_PLANS),
+    countItems(STORES.USER_PLANNING_PREFERENCES),
+    countItems(STORES.RECOMMENDATION_CACHE),
   ]);
 
   return {
@@ -607,7 +675,12 @@ export async function getDatabaseStats(): Promise<{
     userSubstitutionPrefsCount,
     recipeVariantsCount,
     recipeHistoryCount,
-    userKnowledgeCount
+    userKnowledgeCount,
+    applianceAdaptationsCount,
+    userApplianceAdaptationPrefsCount,
+    mealPlansCount,
+    userPlanningPreferencesCount,
+    recommendationCacheCount
   };
 }
 

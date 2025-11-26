@@ -31,62 +31,49 @@ import { areSynonyms } from '../synonyms';
 // DATA LOADING
 // =============================================================================
 
-let ingredientsData: CatalogIngredient[] | null = null;
-
 /**
- * Load ingredients from JSON file
+ * IMPORTANT: This service uses ONLY IndexedDB as the source of truth.
+ * There are NO JSON fallbacks. All data must be in IndexedDB.
+ * Use import/export functions to manage ingredients data.
  */
-async function loadIngredientsFromJSON(): Promise<CatalogIngredient[]> {
-  if (ingredientsData) {
-    return ingredientsData;
-  }
-
-  try {
-    // Fetch from public directory (accessible in production and development)
-    const response = await fetch('/data/ingredients.json');
-    if (!response.ok) {
-      throw new Error('Failed to load ingredients.json');
-    }
-
-    const data = await response.json();
-    ingredientsData = data.ingredients;
-    return ingredientsData!;
-  } catch (error) {
-    console.error('Error loading ingredients:', error);
-    // Fallback: try to import directly (for development)
-    try {
-      const module = await import('../data/ingredients.json');
-      ingredientsData = module.ingredients as CatalogIngredient[];
-      return ingredientsData!;
-    } catch {
-      return [];
-    }
-  }
-}
 
 /**
  * Initialize ingredients cache in IndexedDB
+ * Note: This only checks if the store exists. Data must be imported separately.
  */
 export async function initializeIngredientsCache(): Promise<void> {
   const existingCount = await countItems(STORES.INGREDIENTS_CACHE);
 
   if (existingCount === 0) {
-    const ingredients = await loadIngredientsFromJSON();
-    await bulkAdd(STORES.INGREDIENTS_CACHE, ingredients);
-    console.log(`Initialized ${ingredients.length} ingredients in cache`);
+    console.warn('⚠️ No ingredients found in IndexedDB. Please import ingredients data.');
+  } else {
+    console.log(`Found ${existingCount} ingredients in IndexedDB`);
   }
 }
 
 /**
- * Force refresh the ingredients cache
+ * Clear all ingredients from IndexedDB
+ * WARNING: This will DELETE ALL INGREDIENTS!
+ * Only use this when resetting the database or before importing new data.
+ */
+export async function clearAllIngredients(): Promise<void> {
+  await clearStore(STORES.INGREDIENTS_CACHE);
+  console.warn('⚠️ All ingredients have been cleared from IndexedDB.');
+}
+
+/**
+ * @deprecated This function has been removed. IndexedDB is the only source of truth.
+ * To reset ingredients, export your current data first, then use clearAllIngredients() and importIngredientsFromJSON().
+ */
+export async function resetIngredientsToDefaults(): Promise<number> {
+  throw new Error('resetIngredientsToDefaults() has been removed. Use clearAllIngredients() and importIngredientsFromJSON() instead.');
+}
+
+/**
+ * @deprecated This function has been removed. IndexedDB is the only source of truth.
  */
 export async function refreshIngredientsCache(): Promise<number> {
-  await clearStore(STORES.INGREDIENTS_CACHE);
-  ingredientsData = null;
-
-  const ingredients = await loadIngredientsFromJSON();
-  await bulkAdd(STORES.INGREDIENTS_CACHE, ingredients);
-  return ingredients.length;
+  throw new Error('refreshIngredientsCache() has been removed. IndexedDB is the only source of truth.');
 }
 
 // =============================================================================
@@ -94,17 +81,10 @@ export async function refreshIngredientsCache(): Promise<number> {
 // =============================================================================
 
 /**
- * Get all ingredients from cache or JSON
+ * Get all ingredients from IndexedDB
+ * IMPORTANT: This only reads from IndexedDB. No JSON fallback.
  */
 export async function getAllIngredients(): Promise<CatalogIngredient[]> {
-  // Try cache first
-  const cached = await getAllItems<CatalogIngredient>(STORES.INGREDIENTS_CACHE);
-  if (cached.length > 0) {
-    return cached;
-  }
-
-  // Fallback to JSON and initialize cache
-  await initializeIngredientsCache();
   return getAllItems<CatalogIngredient>(STORES.INGREDIENTS_CACHE);
 }
 
@@ -112,15 +92,14 @@ export async function getAllIngredients(): Promise<CatalogIngredient[]> {
  * Get a single ingredient by ID
  */
 export async function getIngredientById(id: string): Promise<CatalogIngredient | null> {
-  // Try cache first
+  // Get from IndexedDB - the single source of truth
   const cached = await getItem<CatalogIngredient>(STORES.INGREDIENTS_CACHE, id);
   if (cached) {
     return cached;
   }
 
-  // Fallback to JSON search
-  const all = await loadIngredientsFromJSON();
-  return all.find(ing => ing.id === id) || null;
+  // If not in cache, it doesn't exist (cache should always be initialized)
+  return null;
 }
 
 /**
@@ -346,31 +325,19 @@ export function calculateNutrition(
 // =============================================================================
 
 /**
- * Export all ingredients to JSON string (with metadata and IDs)
+ * IMPORTANT: Import/Export functionality has been moved to RemEDatabase class.
+ * These functions now delegate to the centralized database manager.
+ * DO NOT add new import/export logic here - use RemEDatabase instead.
  */
-export async function exportIngredientsToJSON(): Promise<string> {
-  const ingredients = await getAllIngredients();
-  return JSON.stringify({
-    metadata: {
-      version: '1.0.0',
-      lastUpdated: new Date().toISOString(),
-      itemCount: ingredients.length,
-    },
-    ingredients,
-  }, null, 2);
-}
+
+import { db } from '../RemEDatabase';
 
 /**
- * Clean ingredient object for export (removes IDs and internal fields)
+ * Export all ingredients to JSON string (with metadata and IDs)
+ * @deprecated Use db.exportIngredients() instead
  */
-function cleanIngredientForExport(ingredient: CatalogIngredient): Omit<CatalogIngredient, 'id' | 'compatibleWith' | 'substitutes'> & { compatibleWith?: string[]; substitutes?: string[] } {
-  const { id, compatibleWith, substitutes, ...rest } = ingredient;
-  return {
-    ...rest,
-    // Only include these if they have values and we want to keep references
-    ...(compatibleWith?.length ? { compatibleWith } : {}),
-    ...(substitutes?.length ? { substitutes } : {}),
-  };
+export async function exportIngredientsToJSON(): Promise<string> {
+  return db.exportIngredients();
 }
 
 /**
@@ -378,43 +345,7 @@ function cleanIngredientForExport(ingredient: CatalogIngredient): Omit<CatalogIn
  * IMPORTANT: IDs are included to maintain recipe references
  */
 export async function exportIngredientsClean(): Promise<string> {
-  const ingredients = await getAllIngredients();
-
-  // IMPORTANT: Preserve IDs to maintain references in recipes
-  // Do NOT remove IDs as recipes depend on them
-  return JSON.stringify({
-    version: '1.0.0',
-    exportDate: new Date().toISOString().split('T')[0],
-    count: ingredients.length,
-    ingredients: ingredients,
-  }, null, 2);
-}
-
-/**
- * Validate ingredient data structure
- * Note: ID is optional during validation - will be preserved if present or generated if missing
- */
-function validateIngredient(data: unknown): data is Partial<CatalogIngredient> {
-  if (!data || typeof data !== 'object') return false;
-  const ing = data as Record<string, unknown>;
-
-  // Required fields (ID is optional - will be handled during import)
-  const requiredFields = ['name', 'normalizedName', 'category', 'subcategory', 'defaultUnit'];
-  for (const field of requiredFields) {
-    if (typeof ing[field] !== 'string') return false;
-  }
-
-  // Required arrays
-  const requiredArrays = ['synonyms', 'alternativeUnits'];
-  for (const field of requiredArrays) {
-    if (!Array.isArray(ing[field])) return false;
-  }
-
-  // Required objects
-  if (!ing.nutrition || typeof ing.nutrition !== 'object') return false;
-  if (!ing.storage || typeof ing.storage !== 'object') return false;
-
-  return true;
+  return db.exportIngredients();
 }
 
 /**
@@ -427,82 +358,6 @@ export async function importIngredientsFromJSON(
   jsonData: string,
   clearExisting: boolean = true
 ): Promise<{ success: number; errors: string[] }> {
-  const errors: string[] = [];
-
-  try {
-    const parsed = JSON.parse(jsonData);
-
-    // Handle both direct array and object with ingredients property
-    let ingredientsArray: unknown[];
-    if (Array.isArray(parsed)) {
-      ingredientsArray = parsed;
-    } else if (parsed.ingredients && Array.isArray(parsed.ingredients)) {
-      ingredientsArray = parsed.ingredients;
-    } else {
-      throw new Error('El JSON debe contener un array de ingredientes o un objeto con propiedad "ingredients"');
-    }
-
-    if (ingredientsArray.length === 0) {
-      throw new Error('El array de ingredientes está vacío');
-    }
-
-    // Validate and prepare ingredients
-    const validIngredients: CatalogIngredient[] = [];
-    let idCounter = 1;
-
-    for (let i = 0; i < ingredientsArray.length; i++) {
-      const rawIng = ingredientsArray[i];
-
-      if (!validateIngredient(rawIng)) {
-        errors.push(`Ingrediente ${i + 1}: formato inválido`);
-        continue;
-      }
-
-      const rawIngCast = rawIng as Partial<CatalogIngredient>;
-
-      // IMPORTANT: Preserve existing ID if present (for recipe references)
-      // Only generate new ID if missing (for backwards compatibility)
-      const ingredient: CatalogIngredient = {
-        id: rawIngCast.id || `ing_${String(idCounter++).padStart(3, '0')}`,
-        name: rawIngCast.name!,
-        normalizedName: rawIngCast.normalizedName!,
-        category: rawIngCast.category!,
-        subcategory: rawIngCast.subcategory!,
-        synonyms: rawIngCast.synonyms || [],
-        defaultUnit: rawIngCast.defaultUnit!,
-        alternativeUnits: rawIngCast.alternativeUnits || [],
-        nutrition: rawIngCast.nutrition!,
-        storage: rawIngCast.storage!,
-        compatibleWith: rawIngCast.compatibleWith || [],
-        substitutes: rawIngCast.substitutes || [],
-        isCommon: rawIngCast.isCommon ?? false,
-        imageUrl: rawIngCast.imageUrl,
-      };
-
-      validIngredients.push(ingredient);
-    }
-
-    if (validIngredients.length === 0) {
-      throw new Error('No se encontraron ingredientes válidos para importar');
-    }
-
-    // Clear existing if requested
-    if (clearExisting) {
-      await clearStore(STORES.INGREDIENTS_CACHE);
-      ingredientsData = null;
-    }
-
-    // Bulk add to cache
-    const successCount = await bulkAdd(STORES.INGREDIENTS_CACHE, validIngredients);
-
-    return { success: successCount, errors };
-
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      errors.push('El archivo no es un JSON válido');
-    } else {
-      errors.push(error instanceof Error ? error.message : 'Error desconocido');
-    }
-    return { success: 0, errors };
-  }
+  return db.importIngredients(jsonData, clearExisting);
 }
+

@@ -8,7 +8,6 @@ import type { CatalogIngredient, IngredientCategory } from '@/lib/db/schemas/typ
 import {
   getAllIngredients,
   getCategories,
-  initializeIngredientsCache,
 } from '@/lib/db/services/ingredientService';
 
 export default function GlossaryPage() {
@@ -27,9 +26,7 @@ export default function GlossaryPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Initialize ingredients cache first
-      await initializeIngredientsCache();
-
+      // getAllIngredients() will initialize cache if needed
       const [ingredientsData, categoriesData] = await Promise.all([
         getAllIngredients(),
         getCategories(),

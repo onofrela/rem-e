@@ -16,7 +16,7 @@ import {
   generateInventoryAlerts,
 } from '@/lib/db/services/inventoryService';
 import { getAllLocations, initializeDefaultLocations } from '@/lib/db/services/locationService';
-import { getAllIngredients, getIngredientById, initializeIngredientsCache } from '@/lib/db/services/ingredientService';
+import { getAllIngredients, getIngredientById } from '@/lib/db/services/ingredientService';
 
 interface InventoryItemWithName extends InventoryItem {
   ingredientName?: string;
@@ -43,11 +43,8 @@ export default function InventoryPage() {
     try {
       setLoading(true);
 
-      // Initialize databases first
-      await Promise.all([
-        initializeIngredientsCache(),
-        initializeDefaultLocations(),
-      ]);
+      // Initialize locations only (ingredients cache is handled by getAllIngredients)
+      await initializeDefaultLocations();
 
       const [inventoryData, alertsData, locationsData, ingredientsData] = await Promise.all([
         getAllInventory(),

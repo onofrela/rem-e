@@ -4,10 +4,14 @@
  * Centralized exports for all database services.
  */
 
+// RemEDatabase - Centralized Database Manager
+export { RemEDatabase, db } from '../RemEDatabase';
+
 // Ingredient Service
 export {
   initializeIngredientsCache,
   refreshIngredientsCache,
+  resetIngredientsToDefaults,
   getAllIngredients,
   getIngredientById,
   getIngredientsByIds,
@@ -31,6 +35,7 @@ export {
 export {
   initializeRecipesCache,
   refreshRecipesCache,
+  resetRecipesToDefaults,
   getAllRecipes,
   getRecipeById,
   searchRecipes,
@@ -102,3 +107,53 @@ export {
   locationExists,
   getLocationCount,
 } from './locationService';
+
+// Recipe History Service
+export {
+  getAllRecipeHistory,
+  getRecipeHistoryById,
+  getHistoryForRecipe,
+  getCompletedRecipeHistory,
+  getInProgressRecipeHistory,
+  createRecipeHistory,
+  completeRecipeHistory,
+  updateRecipeHistory,
+  deleteRecipeHistory,
+  getCookingStatistics,
+  getRecipeCookCount,
+  getRecipeAverageRating,
+  exportRecipeHistoryToJSON,
+  importRecipeHistoryFromJSON,
+} from './recipeHistoryService';
+
+// Recommendation Service
+export {
+  getDailyRecommendation,
+  invalidateRecommendationCache,
+} from './recommendationService';
+
+// Meal Plan Service
+export {
+  createMealPlan,
+  getMealPlanById,
+  getAllMealPlans,
+  getActiveMealPlan,
+  updateMealPlan,
+  updateMealInPlan,
+  deleteMealPlan,
+  generatePlanName,
+  getNextWeekDates,
+} from './mealPlanService';
+
+// User Preferences Service
+export {
+  getUserPreferences,
+  saveUserPreferences,
+  updateUserPreferences,
+} from './userPreferencesService';
+
+// Planning Algorithm Service
+export {
+  generatePlanFromQuestionnaire,
+  generatePlanWithLLM,
+} from './planningAlgorithmService';

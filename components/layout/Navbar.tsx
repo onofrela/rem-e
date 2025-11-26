@@ -14,6 +14,7 @@ import {
   MapPin,
   Library,
   ChefHat,
+  History,
   LucideIcon
 } from 'lucide-react';
 
@@ -32,6 +33,7 @@ const navItems: NavItem[] = [
   { id: 'locations', label: 'Ubicaciones', icon: MapPin, href: '/locations' },
   { id: 'glossary', label: 'Glosario', icon: Library, href: '/glossary' },
   { id: 'recipes', label: 'Recetas', icon: BookOpen, href: '/recipes' },
+  { id: 'history', label: 'Historial', icon: History, href: '/history' },
   { id: 'plan', label: 'Planificar', icon: Calendar, href: '/plan' },
   { id: 'settings', label: 'Ajustes', icon: Settings, href: '/settings' },
 ];

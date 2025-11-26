@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Card } from './Card';
 import { Badge } from './Badge';
-import type { Recipe } from '@/lib/utils/mock-data';
+import type { Recipe } from '@/lib/db/schemas/types';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -13,7 +13,7 @@ interface RecipeCardProps {
 
 export const RecipeCard = React.forwardRef<HTMLDivElement, RecipeCardProps>(
   ({ recipe, className = '' }, ref) => {
-    const ingredientsCount = recipe.ingredients.length;
+    const ingredientsCount = recipe.ingredients?.length || 0;
 
     return (
       <Link

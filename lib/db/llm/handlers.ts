@@ -16,6 +16,7 @@ import * as variantService from '../services/variantService';
 import * as historyService from '../services/historyService';
 import * as knowledgeService from '../services/knowledgeService';
 import * as adaptationService from '../services/adaptationService';
+import * as applianceAdaptationService from '../services/applianceAdaptationService';
 import type {
   SearchIngredientsParams,
   GetInventoryParams,
@@ -1551,8 +1552,270 @@ async function handleGetCurrentStepDetails(args: Record<string, unknown>): Promi
 }
 
 // =============================================================================
+// APPLIANCE ADAPTATION HANDLERS
+// =============================================================================
+
+async function handleCheckStepAppliances(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const recipeId = args.recipeId as string;
+    const stepNumber = args.stepNumber as number;
+
+    const recipe = await recipeService.getRecipeById(recipeId);
+    if (!recipe) {
+      return { success: false, error: 'Receta no encontrada' };
+    }
+
+    const step = recipe.steps.find(s => s.step === stepNumber);
+    if (!step) {
+      return { success: false, error: 'Paso no encontrado' };
+    }
+
+    if (!step.appliancesUsed || step.appliancesUsed.length === 0) {
+      return {
+        success: true,
+        data: {
+          hasAll: true,
+          message: 'Este paso no requiere electrodomésticos específicos',
+          requiredAppliances: [],
+          missingAppliances: [],
+        }
+      };
+    }
+
+    // Get all user appliances
+    const userAppliances = await userApplianceService.getAllUserAppliances();
+    const userApplianceIds = userAppliances.map(ua => ua.applianceId);
+
+    const checks = await Promise.all(
+      step.appliancesUsed.map(async (appIdOrFunc) => {
+        // Resolve appliance ID or functionality
+        const matchingAppliances = await applianceService.resolveApplianceOrFunctionality(appIdOrFunc);
+
+        if (matchingAppliances.length === 0) {
+          return {
+            applianceId: appIdOrFunc,
+            name: appIdOrFunc,
+            hasIt: false,
+            isExact: false,
+          };
+        }
+
+        // Check if user has ANY appliance that matches (either exact ID or functionality)
+        const hasIt = matchingAppliances.some(app => userApplianceIds.includes(app.id));
+        const matchedAppliance = matchingAppliances.find(app => userApplianceIds.includes(app.id));
+
+        return {
+          applianceId: appIdOrFunc,
+          name: matchedAppliance?.name || matchingAppliances[0]?.name || appIdOrFunc,
+          hasIt,
+          isExact: matchedAppliance !== undefined,
+          alternatives: matchingAppliances.map(a => a.name).join(' o '),
+        };
+      })
+    );
+
+    const missing = checks.filter(c => !c.hasIt);
+    const hasAll = missing.length === 0;
+
+    return {
+      success: true,
+      data: {
+        hasAll,
+        requiredAppliances: checks.map(c => ({ id: c.applianceId, name: c.name, alternatives: c.alternatives })),
+        missingAppliances: missing.map(m => ({ id: m.applianceId, name: m.name, alternatives: m.alternatives })),
+        message: hasAll
+          ? 'Tienes todos los electrodomésticos necesarios'
+          : `Faltan ${missing.length} electrodoméstico(s): ${missing.map(m => m.alternatives || m.name).join(', ')}`,
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error verificando electrodomésticos',
+    };
+  }
+}
+
+async function handleAdaptStepForMissingAppliance(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const recipeId = args.recipeId as string;
+    const stepNumber = args.stepNumber as number;
+    const missingApplianceId = args.missingApplianceId as string;
+    const userAppliances = args.userAppliances as string[];
+
+    const missingAppliance = await applianceService.getApplianceById(missingApplianceId);
+    if (!missingAppliance) {
+      return { success: false, error: 'Electrodoméstico no encontrado' };
+    }
+
+    const recipe = await recipeService.getRecipeById(recipeId);
+    const recipeContext = recipe ? {
+      recipeType: recipe.category,
+      cookingMethod: recipe.tags.join(', ')
+    } : undefined;
+
+    const bestAlt = await applianceAdaptationService.getBestAlternative(
+      missingApplianceId,
+      userAppliances,
+      recipeContext
+    );
+
+    if (!bestAlt.adaptation) {
+      return {
+        success: false,
+        error: `No se encontró alternativa viable para ${missingAppliance.name}`
+      };
+    }
+
+    const altAppliance = await applianceService.getApplianceById(
+      bestAlt.adaptation.alternativeApplianceId
+    );
+
+    return {
+      success: true,
+      data: {
+        originalAppliance: {
+          id: missingApplianceId,
+          name: missingAppliance.name,
+        },
+        alternativeAppliance: {
+          id: bestAlt.adaptation.alternativeApplianceId,
+          name: altAppliance?.name || 'Desconocido',
+        },
+        adaptedInstruction: bestAlt.adaptation.adjustments.newInstruction,
+        confidence: bestAlt.adaptation.confidence,
+        impact: bestAlt.analysis?.impact || [],
+        adjustments: bestAlt.analysis?.adjustments || [],
+        warnings: bestAlt.analysis?.warnings || [],
+        reason: bestAlt.adaptation.reason,
+        userPreferred: bestAlt.userPreferred,
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error adaptando paso',
+    };
+  }
+}
+
+async function handleAddApplianceToKitchen(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const applianceId = args.applianceId as string;
+
+    const appliance = await applianceService.getApplianceById(applianceId);
+    if (!appliance) {
+      return { success: false, error: 'Electrodoméstico no encontrado' };
+    }
+
+    const hasIt = await userApplianceService.hasAppliance(applianceId);
+    if (hasIt) {
+      return {
+        success: true,
+        data: {
+          message: `Ya tienes ${appliance.name} en tu cocina`,
+          alreadyHad: true,
+        }
+      };
+    }
+
+    const userAppliance = await userApplianceService.addUserAppliance({ applianceId });
+
+    return {
+      success: true,
+      data: {
+        message: `${appliance.name} agregado a tu cocina`,
+        userApplianceId: userAppliance.id,
+        alreadyHad: false,
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error agregando electrodoméstico',
+    };
+  }
+}
+
+async function handleRecordApplianceAdaptation(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const originalApplianceId = args.originalApplianceId as string;
+    const alternativeApplianceId = args.alternativeApplianceId as string;
+    const stepNumber = args.stepNumber as number;
+    const recipeId = args.recipeId as string;
+    const successful = (args.successful as boolean) ?? true;
+    const notes = args.notes as string | undefined;
+
+    const recipe = await recipeService.getRecipeById(recipeId);
+    const context = recipe ? [recipe.category, ...recipe.tags] : [];
+
+    await applianceAdaptationService.recordAdaptationUsage(
+      originalApplianceId,
+      alternativeApplianceId,
+      context,
+      successful,
+      notes
+    );
+
+    return {
+      success: true,
+      data: {
+        message: 'Adaptación registrada para aprendizaje futuro',
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error registrando adaptación',
+    };
+  }
+}
+
+// =============================================================================
 // HANDLER REGISTRY
 // =============================================================================
+
+/**
+ * Handles generateWeeklyMealPlan function call
+ */
+async function handleGenerateWeeklyMealPlan(args: {
+  userPrompt: string;
+  availableRecipes: any[];
+  userInventory?: string[];
+}): Promise<FunctionResult> {
+  const { userPrompt, availableRecipes, userInventory = [] } = args;
+
+  // This is a planning function - the actual generation is done by the LLM
+  // We just return a structured prompt for the LLM to follow
+
+  const inventorySet = new Set(userInventory);
+
+  // Score recipes by inventory match
+  const scoredRecipes = availableRecipes.map(recipe => {
+    const matchCount = recipe.ingredients.filter((id: string) =>
+      inventorySet.has(id)
+    ).length;
+    const matchScore = recipe.ingredients.length > 0
+      ? matchCount / recipe.ingredients.length
+      : 0;
+
+    return { ...recipe, inventoryMatch: matchScore };
+  });
+
+  // Sort by inventory match
+  scoredRecipes.sort((a, b) => b.inventoryMatch - a.inventoryMatch);
+
+  return {
+    success: true,
+    data: {
+      message: 'Plan generation initiated with user prompt',
+      userPrompt,
+      totalRecipes: availableRecipes.length,
+      recipesWithHighMatch: scoredRecipes.filter(r => r.inventoryMatch > 0.7).length,
+      instruction: 'Generate a JSON structure with weekly meals following the format: {lunes: {desayuno, almuerzo, comida, cena}, ...}',
+    },
+  };
+}
 
 const handlers: Record<string, FunctionHandler> = {
   // Ingredient handlers
@@ -1592,6 +1855,12 @@ const handlers: Record<string, FunctionHandler> = {
   searchAppliances: handleSearchAppliances,
   hasAppliance: handleHasAppliance,
 
+  // Appliance adaptation handlers
+  checkStepAppliances: handleCheckStepAppliances,
+  adaptStepForMissingAppliance: handleAdaptStepForMissingAppliance,
+  addApplianceToKitchen: handleAddApplianceToKitchen,
+  recordApplianceAdaptation: handleRecordApplianceAdaptation,
+
   // Substitution handlers
   suggestSubstitution: handleSuggestSubstitution,
   recordSubstitutionPreference: handleRecordSubstitutionPreference,
@@ -1618,6 +1887,9 @@ const handlers: Record<string, FunctionHandler> = {
   substituteIngredientInCooking: handleSubstituteIngredientInCooking,
   createTimerFromStep: handleCreateTimerFromStep,
   getCurrentStepDetails: handleGetCurrentStepDetails,
+
+  // Meal planning handlers
+  generateWeeklyMealPlan: handleGenerateWeeklyMealPlan,
 };
 
 /**

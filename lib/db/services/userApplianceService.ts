@@ -122,21 +122,18 @@ export async function getApplianceCountByCategory(): Promise<Record<string, numb
 // =============================================================================
 
 /**
+ * IMPORTANT: Import/Export functionality has been moved to RemEDatabase class.
+ * These functions now delegate to the centralized database manager.
+ * DO NOT add new import/export logic here - use RemEDatabase instead.
+ */
+
+import { db } from '../RemEDatabase';
+
+/**
  * Export user appliances to JSON
  */
 export async function exportUserAppliancesToJSON(): Promise<string> {
-  const appliances = await getAllUserAppliances();
-
-  const data = {
-    metadata: {
-      version: '1.0.0',
-      exportedAt: new Date().toISOString(),
-      itemCount: appliances.length,
-    },
-    userAppliances: appliances,
-  };
-
-  return JSON.stringify(data, null, 2);
+  return db.exportUserAppliances();
 }
 
 /**
@@ -146,40 +143,5 @@ export async function importUserAppliancesFromJSON(
   jsonData: string,
   clearExisting: boolean = false
 ): Promise<{ success: number; errors: string[] }> {
-  const errors: string[] = [];
-
-  try {
-    const data = JSON.parse(jsonData);
-
-    if (!data.userAppliances || !Array.isArray(data.userAppliances)) {
-      throw new Error('Invalid JSON format: missing or invalid userAppliances array');
-    }
-
-    if (clearExisting) {
-      const all = await getAllUserAppliances();
-      for (const app of all) {
-        await deleteUserAppliance(app.id);
-      }
-    }
-
-    let successCount = 0;
-    for (const appData of data.userAppliances) {
-      try {
-        const appliance: UserAppliance = {
-          ...appData,
-          createdAt: new Date(appData.createdAt),
-          updatedAt: new Date(appData.updatedAt),
-        };
-        await addItem(STORES.USER_APPLIANCES, appliance);
-        successCount++;
-      } catch (error) {
-        errors.push(`Failed to import appliance ${appData.id}: ${error}`);
-      }
-    }
-
-    return { success: successCount, errors };
-  } catch (error) {
-    errors.push(error instanceof Error ? error.message : 'Unknown error');
-    return { success: 0, errors };
-  }
+  return db.importUserAppliances(jsonData, clearExisting);
 }

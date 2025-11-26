@@ -16,7 +16,6 @@ import {
 import {
   getAllAppliances,
   getApplianceById,
-  initializeAppliancesCache,
 } from '@/lib/db/services/applianceService';
 
 interface UserApplianceWithCatalog {
@@ -39,9 +38,7 @@ export default function MiCocinaPage() {
     try {
       setLoading(true);
 
-      // Initialize appliances cache
-      await initializeAppliancesCache();
-
+      // getAllAppliances() will initialize cache if needed
       const [userAppliancesData, catalogData] = await Promise.all([
         getAllUserAppliances(),
         getAllAppliances(),

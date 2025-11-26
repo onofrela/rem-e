@@ -479,15 +479,22 @@ export async function getInventorySummary(): Promise<{
 }
 
 // =============================================================================
-// EXPORT
+// EXPORT / IMPORT
 // =============================================================================
 
 /**
- * Export inventory to JSON string
+ * IMPORTANT: Import/Export functionality has been moved to RemEDatabase class.
+ * These functions now delegate to the centralized database manager.
+ * DO NOT add new import/export logic here - use RemEDatabase instead.
+ */
+
+import { db } from '../RemEDatabase';
+
+/**
+ * Export inventory to JSON string with metadata
  */
 export async function exportInventoryToJSON(): Promise<string> {
-  const inventory = await getAllInventory();
-  return JSON.stringify(inventory, null, 2);
+  return db.exportInventory();
 }
 
 /**
@@ -497,40 +504,5 @@ export async function importInventoryFromJSON(
   jsonData: string,
   clearExisting: boolean = false
 ): Promise<{ success: number; errors: string[] }> {
-  const errors: string[] = [];
-  let success = 0;
-
-  try {
-    const data = JSON.parse(jsonData) as InventoryItem[];
-
-    if (!Array.isArray(data)) {
-      throw new Error('JSON data must be an array');
-    }
-
-    if (clearExisting) {
-      const all = await getAllInventory();
-      for (const item of all) {
-        await deleteInventoryItem(item.id);
-      }
-    }
-
-    for (const item of data) {
-      try {
-        await addItem(STORES.INVENTORY, {
-          ...item,
-          id: generateId('inv'),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-        success++;
-      } catch {
-        errors.push(`Failed to import item: ${item.ingredientId}`);
-      }
-    }
-
-    return { success, errors };
-  } catch (error) {
-    errors.push(error instanceof Error ? error.message : 'Unknown error');
-    return { success, errors };
-  }
+  return db.importInventory(jsonData, clearExisting);
 }

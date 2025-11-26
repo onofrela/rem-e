@@ -37,61 +37,49 @@ import { getIngredientById, getIngredientsByIds } from './ingredientService';
 // DATA LOADING
 // =============================================================================
 
-let recipesData: Recipe[] | null = null;
-
 /**
- * Load recipes from JSON file
+ * IMPORTANT: This service uses ONLY IndexedDB as the source of truth.
+ * There are NO JSON fallbacks. All data must be in IndexedDB.
+ * Use import/export functions to manage recipes data.
  */
-async function loadRecipesFromJSON(): Promise<Recipe[]> {
-  if (recipesData) {
-    return recipesData;
-  }
-
-  try {
-    const response = await fetch('/data/recipes.json');
-    if (!response.ok) {
-      throw new Error('Failed to load recipes.json');
-    }
-
-    const data = await response.json();
-    recipesData = data.recipes;
-    return recipesData!;
-  } catch (error) {
-    console.error('Error loading recipes:', error);
-    // Fallback: try to import directly (for development)
-    try {
-      const module = await import('../data/recipes.json');
-      recipesData = module.recipes as any;
-      return recipesData!;
-    } catch {
-      return [];
-    }
-  }
-}
 
 /**
  * Initialize recipes cache in IndexedDB
+ * Note: This only checks if the store exists. Data must be imported separately.
  */
 export async function initializeRecipesCache(): Promise<void> {
   const existingCount = await countItems(STORES.RECIPES_CACHE);
 
   if (existingCount === 0) {
-    const recipes = await loadRecipesFromJSON();
-    await bulkAdd(STORES.RECIPES_CACHE, recipes);
-    console.log(`Initialized ${recipes.length} recipes in cache`);
+    console.warn('⚠️ No recipes found in IndexedDB. Please import recipes data.');
+  } else {
+    console.log(`Found ${existingCount} recipes in IndexedDB`);
   }
 }
 
 /**
- * Force refresh the recipes cache
+ * Clear all recipes from IndexedDB
+ * WARNING: This will DELETE ALL RECIPES!
+ * Only use this when resetting the database or before importing new data.
+ */
+export async function clearAllRecipes(): Promise<void> {
+  await clearStore(STORES.RECIPES_CACHE);
+  console.warn('⚠️ All recipes have been cleared from IndexedDB.');
+}
+
+/**
+ * @deprecated This function has been removed. IndexedDB is the only source of truth.
+ * To reset recipes, export your current data first, then use clearAllRecipes() and importRecipesFromJSON().
+ */
+export async function resetRecipesToDefaults(): Promise<number> {
+  throw new Error('resetRecipesToDefaults() has been removed. Use clearAllRecipes() and importRecipesFromJSON() instead.');
+}
+
+/**
+ * @deprecated This function has been removed. IndexedDB is the only source of truth.
  */
 export async function refreshRecipesCache(): Promise<number> {
-  await clearStore(STORES.RECIPES_CACHE);
-  recipesData = null;
-
-  const recipes = await loadRecipesFromJSON();
-  await bulkAdd(STORES.RECIPES_CACHE, recipes);
-  return recipes.length;
+  throw new Error('refreshRecipesCache() has been removed. IndexedDB is the only source of truth.');
 }
 
 // =============================================================================
@@ -99,17 +87,10 @@ export async function refreshRecipesCache(): Promise<number> {
 // =============================================================================
 
 /**
- * Get all recipes from cache or JSON
+ * Get all recipes from IndexedDB
+ * IMPORTANT: This only reads from IndexedDB. No JSON fallback.
  */
 export async function getAllRecipes(): Promise<Recipe[]> {
-  // Try cache first
-  const cached = await getAllItems<Recipe>(STORES.RECIPES_CACHE);
-  if (cached.length > 0) {
-    return cached;
-  }
-
-  // Fallback to JSON and initialize cache
-  await initializeRecipesCache();
   return getAllItems<Recipe>(STORES.RECIPES_CACHE);
 }
 
@@ -117,15 +98,14 @@ export async function getAllRecipes(): Promise<Recipe[]> {
  * Get a single recipe by ID
  */
 export async function getRecipeById(id: string): Promise<Recipe | null> {
-  // Try cache first
+  // Get from IndexedDB - the single source of truth
   const cached = await getItem<Recipe>(STORES.RECIPES_CACHE, id);
   if (cached) {
     return cached;
   }
 
-  // Fallback to JSON search
-  const all = await loadRecipesFromJSON();
-  return all.find(recipe => recipe.id === id) || null;
+  // If not in cache, it doesn't exist (cache should always be initialized)
+  return null;
 }
 
 /**
@@ -471,20 +451,19 @@ export async function getRecipeDetails(recipeId: string): Promise<{
 // =============================================================================
 
 /**
+ * IMPORTANT: Import/Export functionality has been moved to RemEDatabase class.
+ * These functions now delegate to the centralized database manager.
+ * DO NOT add new import/export logic here - use RemEDatabase instead.
+ */
+
+import { db } from '../RemEDatabase';
+
+/**
  * Export all recipes to JSON string with IDs preserved
  * IMPORTANT: Both recipe IDs and ingredient IDs are included to maintain proper references
  */
 export async function exportRecipesClean(): Promise<string> {
-  const recipes = await getAllRecipes();
-  return JSON.stringify({
-    metadata: {
-      version: '1.0.0',
-      exportDate: new Date().toISOString(),
-      recipeCount: recipes.length,
-      description: 'Rem-E Recipes Export'
-    },
-    recipes,
-  }, null, 2);
+  return db.exportRecipes();
 }
 
 /**
@@ -495,63 +474,5 @@ export async function importRecipesFromJSON(jsonString: string): Promise<{
   success: number;
   errors: string[];
 }> {
-  try {
-    const data = JSON.parse(jsonString);
-
-    // Validate structure
-    if (!data.recipes || !Array.isArray(data.recipes)) {
-      throw new Error('Formato JSON inválido: debe contener un array "recipes"');
-    }
-
-    const errors: string[] = [];
-    const validRecipes: Recipe[] = [];
-
-    // Validate each recipe
-    for (const recipe of data.recipes) {
-      try {
-        // Basic validation - ID is required to maintain references
-        if (!recipe.id || !recipe.name || !recipe.ingredients || !recipe.steps) {
-          errors.push(`Receta inválida: ${recipe.name || 'sin nombre'} - faltan campos requeridos (id, name, ingredients, steps)`);
-          continue;
-        }
-
-        // Validate that ingredients array has proper structure
-        if (!Array.isArray(recipe.ingredients) || recipe.ingredients.length === 0) {
-          errors.push(`Receta "${recipe.name}": debe tener al menos un ingrediente`);
-          continue;
-        }
-
-        // Validate that each ingredient has required fields including ingredientId
-        const hasInvalidIngredients = recipe.ingredients.some((ing: any) =>
-          !ing.ingredientId || !ing.displayName || !ing.unit
-        );
-
-        if (hasInvalidIngredients) {
-          errors.push(`Receta "${recipe.name}": algunos ingredientes no tienen ingredientId, displayName o unit`);
-          continue;
-        }
-
-        validRecipes.push(recipe);
-      } catch (err) {
-        errors.push(`Error en receta ${recipe.name}: ${err instanceof Error ? err.message : 'error desconocido'}`);
-      }
-    }
-
-    // Clear existing recipes and add new ones
-    if (validRecipes.length > 0) {
-      await clearStore(STORES.RECIPES_CACHE);
-      await bulkAdd(STORES.RECIPES_CACHE, validRecipes);
-      recipesData = null; // Clear in-memory cache
-    }
-
-    return {
-      success: validRecipes.length,
-      errors,
-    };
-  } catch (error) {
-    return {
-      success: 0,
-      errors: [error instanceof Error ? error.message : 'Error al procesar el archivo JSON'],
-    };
-  }
+  return db.importRecipes(jsonString, true);
 }

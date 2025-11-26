@@ -6,8 +6,8 @@ import { MainLayout } from '@/components/layout';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { api } from '@/lib/api/mock-api';
-import { Recipe } from '@/lib/utils/mock-data';
+import type { Recipe } from '@/lib/db/schemas/types';
+import * as recipeService from '@/lib/db/services/recipeService';
 
 export default function RecipeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -23,8 +23,11 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
   }, [unwrappedParams.id]);
 
   const loadRecipe = async () => {
-    const data = await api.getRecipe(unwrappedParams.id);
+    const data = await recipeService.getRecipeById(unwrappedParams.id);
+    console.log('[RecipeDetail] Loaded recipe:', data);
     if (data) {
+      console.log('[RecipeDetail] Recipe steps:', data.steps);
+      console.log('[RecipeDetail] Appliances in steps:', data.steps.map(s => ({ step: s.step, appliances: s.appliancesUsed })));
       setRecipe(data);
       setServings(data.servings);
     }
@@ -47,8 +50,8 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
 
   const handleShowSubstitutions = async (ingredient: string) => {
     setShowSubstitutions(ingredient);
-    const subs = await api.getSubstitutions(ingredient);
-    setSubstitutions(subs);
+    // TODO: Implement real substitution service
+    setSubstitutions([]);
   };
 
   const startCooking = () => {
@@ -116,8 +119,8 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
                 <Badge variant="info">⏱ {recipe.time} min</Badge>
                 <Badge variant="success">👨‍🍳 {recipe.difficulty}</Badge>
                 <Badge variant="default">🍴 {recipe.servings} porciones</Badge>
-                {recipe.calories && (
-                  <Badge variant="warning">🔥 {recipe.calories} kcal</Badge>
+                {recipe.nutritionPerServing?.calories && (
+                  <Badge variant="warning">🔥 {recipe.nutritionPerServing.calories} kcal</Badge>
                 )}
               </div>
             </Card>
@@ -187,7 +190,7 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
                         <span className="font-medium">
                           {Math.round(ing.amount * servingsRatio * 10) / 10} {ing.unit}
                         </span>
-                        {' '}{ing.name}
+                        {' '}{ing.displayName}
                         {ing.optional && (
                           <Badge variant="default" size="sm" className="ml-2">
                             Opcional
@@ -199,7 +202,7 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleShowSubstitutions(ing.name);
+                        handleShowSubstitutions(ing.displayName);
                       }}
                       className="text-sm text-[var(--color-primary)] hover:underline"
                     >
@@ -224,6 +227,73 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
               )}
             </div>
           </Card>
+
+          {/* Electrodomésticos necesarios */}
+          {(() => {
+            // Recolectar todos los electrodomésticos únicos de todos los pasos
+            const allAppliances = new Set<string>();
+            recipe.steps.forEach(step => {
+              step.appliancesUsed?.forEach(app => allAppliances.add(app));
+            });
+
+            console.log('[RecipeDetail] All appliances collected:', Array.from(allAppliances));
+
+            if (allAppliances.size === 0) {
+              console.log('[RecipeDetail] No appliances found, hiding section');
+              return null;
+            }
+
+            // Nombres amigables para funcionalidades
+            const functionalityNames: Record<string, string> = {
+              'stovetop_cooking': 'Estufa/Parrilla',
+              'oven_baking': 'Horno',
+              'blending': 'Licuadora',
+              'microwave_heating': 'Microondas',
+              'grilling': 'Parrilla/Grill',
+              'food_processing': 'Procesador de alimentos',
+              'mixing': 'Batidora',
+              'refrigerating': 'Refrigerador',
+              'freezing': 'Congelador',
+              'boiling_water': 'Hervir agua',
+              'air_frying': 'Freidora de aire',
+              'slow_cooking': 'Olla de cocción lenta',
+              'pressure_cooking': 'Olla de presión',
+              'toasting': 'Tostadora',
+              'chopping': 'Cuchillo/Tabla de cortar',
+              'measuring': 'Tazas/Cucharas medidoras',
+              'weighing': 'Báscula de cocina',
+              'straining': 'Colador',
+              'whisking': 'Batidor manual',
+              'rolling': 'Rodillo',
+              'baking_sheet': 'Charola para hornear',
+              'mixing_bowl': 'Tazón para mezclar',
+            };
+
+            return (
+              <Card variant="elevated" padding="lg" className="mb-6">
+                <h2 className="text-2xl font-bold mb-4 text-[var(--color-text-primary)]">
+                  Electrodomésticos necesarios
+                </h2>
+                <div className="flex flex-wrap gap-3">
+                  {Array.from(allAppliances).map((functionality) => (
+                    <Card key={functionality} variant="outlined" padding="md" className="bg-[var(--color-secondary-light)]/20">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">🔧</span>
+                        <div>
+                          <p className="font-semibold text-[var(--color-text-primary)]">
+                            {functionalityNames[functionality] || functionality}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+                <p className="text-sm text-[var(--color-text-secondary)] mt-4">
+                  💡 Al iniciar la guía, verificaremos si tienes estos electrodomésticos y te ayudaremos a adaptarte si no los tienes.
+                </p>
+              </Card>
+            );
+          })()}
 
           {/* Steps Preview */}
           <Card variant="elevated" padding="lg" className="mb-6">

@@ -1,24 +1,34 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { MainLayout } from '@/components/layout';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { RecipeCarousel } from '@/components/ui/RecipeCarousel';
 import { RecipeCard } from '@/components/ui/RecipeCard';
-import { mockRecipes, type Recipe } from '@/lib/utils/mock-data';
+import type { Recipe } from '@/lib/db/schemas/types';
+import * as recipeService from '@/lib/db/services/recipeService';
 
 export default function RecipesPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+
+  useEffect(() => {
+    const loadRecipes = async () => {
+      const allRecipes = await recipeService.getAllRecipes();
+      setRecipes(allRecipes);
+    };
+    loadRecipes();
+  }, []);
 
   // Filter recipes based on search query
   const filteredRecipes = useMemo(() => {
-    return mockRecipes.filter(recipe =>
+    return recipes.filter(recipe =>
       recipe.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       recipe.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       recipe.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-  }, [searchQuery]);
+  }, [searchQuery, recipes]);
 
   // Group recipes by category
   const recipesByCategory = useMemo(() => {
