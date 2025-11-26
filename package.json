@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "ngrok": "node scripts/start-ngrok.js",
+    "ngrok:install": "npm install --save-dev @ngrok/ngrok"
   },
   "dependencies": {
     "@aws-sdk/client-polly": "^3.936.0",
@@ -17,6 +19,7 @@
   },
   "devDependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
+    "@ngrok/ngrok": "^1.6.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
