@@ -56,7 +56,8 @@ export default function PlanPage() {
       setLlmPrompt('');
     } catch (error) {
       console.error('❌ Error generating plan with LLM:', error);
-      alert(`Error al generar el plan: ${error instanceof Error ? error.message : 'Unknown error'}\n\nAsegúrate de que LM Studio esté corriendo en http://localhost:1234 y que CORS esté habilitado.`);
+      const lmStudioUrl = process.env.NEXT_PUBLIC_LM_STUDIO_URL || 'http://localhost:1234';
+      alert(`Error al generar el plan: ${error instanceof Error ? error.message : 'Unknown error'}\n\nAsegúrate de que LM Studio esté corriendo en:\n${lmStudioUrl}\n\nY que CORS esté habilitado en LM Studio (Developer > CORS > Enable All Origins).`);
     } finally {
       setGenerating(false);
     }

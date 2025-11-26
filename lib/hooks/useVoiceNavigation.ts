@@ -127,6 +127,46 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
     return text;
   }, []);
 
+  // Clasificar intent: navegación vs pregunta
+  const classifyIntent = useCallback((text: string): { type: 'navigation' | 'question'; route?: string } => {
+    const lowerText = text.toLowerCase().trim();
+
+    // Palabras que indican pregunta
+    const questionIndicators = [
+      'qué', 'que', 'cuánto', 'cuanto', 'cuánta', 'cuanta',
+      'cuántos', 'cuantos', 'cuántas', 'cuantas',
+      'cómo', 'como', 'dónde', 'donde', 'por qué', 'porque',
+      'tengo', 'hay', 'puedo', 'necesito', 'falta', 'busca',
+      'buscar', 'encuentra', 'encontrar', 'dame', 'dime',
+      'cuál', 'cual', 'sería', 'seria', 'explica', 'recomienda'
+    ];
+
+    const isQuestion = questionIndicators.some(q => lowerText.includes(q));
+
+    // Verbos de navegación
+    const navigationVerbs = ['ve a', 'ir a', 'abre', 'muestra', 'navega'];
+    const hasNavVerb = navigationVerbs.some(v => lowerText.includes(v));
+
+    // Si tiene verbo de navegación explícito, es navegación
+    if (hasNavVerb) {
+      return { type: 'navigation' };
+    }
+
+    // Si es pregunta clara, es pregunta
+    if (isQuestion) {
+      return { type: 'question' };
+    }
+
+    // Buscar secciones de navegación específicas
+    const route = parseNavigationCommand(text);
+    if (route) {
+      return { type: 'navigation', route: route.path };
+    }
+
+    // Por defecto, es pregunta
+    return { type: 'question' };
+  }, []);
+
   // Detectar comandos de cocina
   const detectCookingCommand = useCallback((text: string): string | null => {
     const lowerText = text.toLowerCase();
@@ -196,6 +236,49 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
     wakeWordDetectedRef.current = false;
   }, []);
 
+  // Procesar pregunta con LLM
+  const processQuestion = useCallback(async (question: string) => {
+    console.log("[Voice] Procesando pregunta con LLM:", question);
+    setLastCommand(question);
+    setStatus("thinking");
+    setLlmResponse(null);
+
+    try {
+      // Llamar a la API del asistente
+      const response = await fetch('/api/assistant', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: question,
+          context: currentContext,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setLlmResponse({
+          question,
+          response: data.response,
+          timestamp: Date.now(),
+        });
+        console.log("[Voice] Respuesta LLM:", data.response);
+        console.log("[Voice] Funciones ejecutadas:", data.functionsCalled?.map((f: any) => f.name).join(', ') || 'ninguna');
+      } else {
+        // Error del asistente
+        setError(createVoiceError("unknown", data.error || "Error al procesar la pregunta"));
+      }
+    } catch (err) {
+      console.error("[Voice] Error llamando al asistente:", err);
+      setError(createVoiceError("unknown", "No se pudo conectar con el asistente"));
+    } finally {
+      setStatus("listening");
+      wakeWordDetectedRef.current = false;
+    }
+  }, [currentContext]);
+
   // Manejar resultado de reconocimiento de voz
   const handleRecognitionResult = useCallback(
     (event: any) => {
@@ -229,8 +312,17 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
             if (command) {
               // Si hay comando inmediatamente después de wake word, procesarlo
               console.log("[Voice] Wake word detected with command:", command);
-              setLastCommand(command);
-              processNavigation(command);
+
+              // Clasificar intent
+              const intent = classifyIntent(command);
+              console.log("[Voice] Intent classification:", intent);
+
+              if (intent.type === 'navigation') {
+                processNavigation(command);
+              } else {
+                // Es una pregunta, procesarla con el LLM
+                processQuestion(command);
+              }
             } else {
               // Solo wake word, esperar comando
               console.log("[Voice] Wake word detected, waiting for command");
@@ -241,12 +333,22 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
         } else {
           // Ya detectamos wake word, este es el comando
           console.log("[Voice] Processing command after wake word:", transcriptText);
-          processNavigation(transcriptText);
+
+          // Clasificar intent
+          const intent = classifyIntent(transcriptText);
+          console.log("[Voice] Intent classification:", intent);
+
+          if (intent.type === 'navigation') {
+            processNavigation(transcriptText);
+          } else {
+            // Es una pregunta, procesarla con el LLM
+            processQuestion(transcriptText);
+          }
           setTranscript("");
         }
       }
     },
-    [detectWakeWord, extractCommand, processNavigation, detectCookingCommand, processCookingCommand, currentContext.inRecipeGuide]
+    [detectWakeWord, extractCommand, classifyIntent, processNavigation, processQuestion, detectCookingCommand, processCookingCommand, currentContext.inRecipeGuide]
   );
 
   // Limpiar respuesta del LLM

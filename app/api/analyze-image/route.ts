@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const lmStudioUrl = process.env.LM_STUDIO_API_URL || 'http://127.0.0.1:1234';
+    const lmStudioUrl = process.env.NEXT_PUBLIC_LM_STUDIO_URL || process.env.LM_STUDIO_API_URL || process.env.LM_STUDIO_URL || 'http://127.0.0.1:1234';
 
     // Prompt dinámico para análisis de comida
     const systemPrompt = `Eres un experto en análisis de alimentos y nutrición. Tu tarea es analizar imágenes de comida y proporcionar información detallada.
@@ -84,6 +84,7 @@ INSTRUCCIONES:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({
         model: 'qwen-vl',

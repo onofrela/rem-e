@@ -41,7 +41,7 @@ interface AdaptStepResponse {
 // LM STUDIO CONFIGURATION
 // =============================================================================
 
-const LM_STUDIO_URL = process.env.LM_STUDIO_URL || 'http://localhost:1234';
+const LM_STUDIO_URL = process.env.NEXT_PUBLIC_LM_STUDIO_URL || process.env.LM_STUDIO_URL || 'http://localhost:1234';
 
 // =============================================================================
 // SYSTEM PROMPT
@@ -97,6 +97,7 @@ async function callLMStudio(prompt: string): Promise<string> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
     },
     body: JSON.stringify({
       messages: [

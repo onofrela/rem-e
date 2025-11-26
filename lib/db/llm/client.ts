@@ -213,7 +213,10 @@ export class LMStudioClient {
     try {
       const response = await fetch(`${this.baseUrl}/v1/models`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
       });
       return response.ok;
     } catch {
@@ -315,6 +318,7 @@ export class LMStudioClient {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify(request),
     });

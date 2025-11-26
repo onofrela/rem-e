@@ -42,7 +42,7 @@ interface AssistantResponse {
 // LM STUDIO CONFIGURATION
 // =============================================================================
 
-const LM_STUDIO_URL = process.env.LM_STUDIO_URL || 'http://localhost:1234';
+const LM_STUDIO_URL = process.env.NEXT_PUBLIC_LM_STUDIO_URL || process.env.LM_STUDIO_URL || 'http://localhost:1234';
 
 const SYSTEM_PROMPT = `Eres Rem-E, un asistente de cocina inteligente y amigable. Tu objetivo es ayudar a los usuarios a:
 
@@ -144,6 +144,7 @@ async function callLMStudio(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
     },
     body: JSON.stringify(payload),
   });
@@ -319,6 +320,9 @@ export async function GET(): Promise<NextResponse> {
     // Check LM Studio connection
     const response = await fetch(`${LM_STUDIO_URL}/v1/models`, {
       method: 'GET',
+      headers: {
+        'ngrok-skip-browser-warning': 'true',
+      },
     });
 
     const lmStudioAvailable = response.ok;
