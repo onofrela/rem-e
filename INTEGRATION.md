@@ -52,54 +52,66 @@ Persistent local storage for ingredients with smart duplicate detection.
 
 ---
 
-### 3. Voice Navigation with AI (from intento-3)
+### 3. Voice Navigation with Web Speech API
 
-Voice control for navigating the app and asking cooking questions.
+Voice control for navigating the app and controlling cooking steps.
 
-**Location:** `voice-server/` (Python) + `lib/voice/` (TypeScript)
+**Location:** `lib/hooks/useVoiceNavigation.ts` + `components/voice/VoiceAssistant.tsx`
 
 **Components:**
 
-#### Python Voice Server
-- `voice-server/voice_server.py` - WebSocket server with Vosk
-- `voice-server/config.py` - Configuration
-- `voice-server/requirements.txt` - Python dependencies
-
-#### Frontend
+#### Frontend Voice Recognition
+- `lib/hooks/useVoiceNavigation.ts` - Web Speech API hook
+- `lib/hooks/useVoice.ts` - Simple voice commands hook
 - `lib/voice/navigationCommands.ts` - Route mapping
-- `lib/hooks/useVoiceNavigation.ts` - WebSocket hook
 - `components/voice/VoiceAssistant.tsx` - Floating widget
 
 **How it works:**
-1. Python server listens for wake word ("Rem-E")
-2. Classifies intent: navigation vs question
-3. Navigation: sends route to frontend via WebSocket
-4. Question: queries LM Studio, returns response
+1. Uses browser's native Web Speech API (Chrome, Edge, Safari)
+2. Listens for wake word ("Rem-E")
+3. Processes navigation commands locally
+4. During cooking, responds to step commands without wake word
 
 **Voice Commands:**
 ```
 "Rem-E, ve a recetas"        → /recipes
 "Rem-E, abre el inventario"  → /inventory
 "Rem-E, ir a cocinar"        → /cook
-"Rem-E, ¿qué puedo cocinar?" → LLM response
+
+During cooking (no wake word needed):
+"siguiente"                   → Next step
+"anterior"                    → Previous step
+"repetir"                     → Repeat current step
+"pausar"                      → Pause
+"reanudar"                    → Resume
+"timer 5 minutos"            → Start timer
 ```
+
+**Browser Compatibility:**
+- ✅ Chrome/Edge (full support)
+- ✅ Safari (iOS/macOS)
+- ❌ Firefox (limited support)
+
+**Requirements:**
+- Modern browser with Web Speech API
+- Microphone access
+- Internet connection (for speech recognition)
 
 ---
 
-### 4. LLM Chatbot Integration (from intento-3)
+### 4. Text-to-Speech with Amazon Polly
 
-Cooking assistant that answers questions using context from the app.
+Natural voice feedback during cooking with Amazon Polly TTS.
 
 **Features:**
-- Contextual responses based on user's inventory
-- Recipe suggestions
-- Cooking tips and techniques
-- Ingredient substitutions
+- High-quality voice synthesis
+- Automatic step narration
+- Fallback to browser TTS
+- Cached audio for performance
 
-**Context sent to LLM:**
-- Current inventory (from IndexedDB)
-- Saved recipes
-- Current page
+**Files:**
+- `lib/hooks/usePollyTTS.ts` - TTS hook
+- `app/api/tts/route.ts` - Polly API endpoint
 
 ---
 
@@ -121,7 +133,7 @@ cp .env.example .env.local
 
 Edit `.env.local`:
 ```env
-# LM Studio (required for vision and chatbot)
+# LM Studio (required for vision)
 LM_STUDIO_API_URL=http://127.0.0.1:1234
 
 # AWS Polly (optional, for TTS)
@@ -134,26 +146,9 @@ AWS_SECRET_ACCESS_KEY=your_secret
 
 1. Download [LM Studio](https://lmstudio.ai/)
 2. Download a vision model (Qwen VL recommended)
-3. Download a chat model (Llama 2, Mistral, etc.)
-4. Start local server on port 1234
+3. Start local server on port 1234
 
-### 4. Setup Voice Server (Optional)
-
-```bash
-cd voice-server
-
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Download Vosk model
-# https://alphacephei.com/vosk/models
-# Place in voice-server/models/vosk-model-small-es-0.42/
-
-# Run server
-python voice_server.py
-```
-
-### 5. Start the App
+### 4. Start the App
 
 ```bash
 npm run dev
@@ -175,28 +170,22 @@ npm run dev
           │                │                  │
           ▼                ▼                  │
 ┌─────────────────┐  ┌─────────────┐         │
-│ /api/analyze-   │  │  WebSocket  │         │
-│ image           │  │ :8765       │         │
-└────────┬────────┘  └──────┬──────┘         │
-         │                  │                 │
-         ▼                  ▼                 │
+│ /api/analyze-   │  │ Web Speech  │         │
+│ image           │  │     API     │         │
+└────────┬────────┘  └─────────────┘         │
+         │                                    │
+         ▼                                    │
 ┌─────────────────────────────────────┐      │
 │         LM Studio (:1234)           │      │
 │                                     │      │
-│  ┌──────────┐    ┌──────────────┐  │      │
-│  │ Qwen VL  │    │ Chat Model   │  │      │
-│  │ (Vision) │    │ (Questions)  │  │      │
-│  └──────────┘    └──────────────┘  │      │
+│  ┌──────────┐                       │      │
+│  │ Qwen VL  │                       │      │
+│  │ (Vision) │                       │      │
+│  └──────────┘                       │      │
 └─────────────────────────────────────┘      │
                                              │
-┌─────────────────────────────────────┐      │
-│     Python Voice Server (:8765)     │◄─────┘
-│                                     │  (context)
-│  ┌──────────┐    ┌──────────────┐  │
-│  │   Vosk   │    │  LLM Client  │  │
-│  │  (ASR)   │    │              │  │
-│  └──────────┘    └──────────────┘  │
-└─────────────────────────────────────┘
+                     Browser                 │
+                   (Context) ◄───────────────┘
 ```
 
 ---
@@ -233,14 +222,8 @@ rem-e/
 │   │
 │   └── hooks/
 │       ├── useVoiceNavigation.ts     # Voice navigation hook
-│       ├── useVoice.ts               # Existing voice hook
+│       ├── useVoice.ts               # Basic voice hook
 │       └── usePollyTTS.ts            # TTS hook
-│
-└── voice-server/                     # Python backend
-    ├── voice_server.py
-    ├── config.py
-    ├── requirements.txt
-    └── README.md
 ```
 
 ---
@@ -252,13 +235,10 @@ rem-e/
 - Check that local server is enabled (Settings > Local Server)
 - Verify port 1234 is not blocked
 
-### "No se encontró el modelo Vosk"
-- Download from https://alphacephei.com/vosk/models
-- Extract to `voice-server/models/`
-
-### Voice widget shows "Sin conexión"
-- Run `python voice_server.py` first
-- Check WebSocket connection on port 8765
+### Voice widget shows error
+- Allow microphone access in browser
+- Use Chrome, Edge, or Safari
+- Check internet connection (required for speech recognition)
 
 ### Image detection returns generic results
 - Ensure Qwen VL model is loaded in LM Studio

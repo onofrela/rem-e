@@ -1,48 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-// Web Speech API types (not fully typed in TypeScript)
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-  isFinal: boolean;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: Event) => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-  abort(): void;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: new () => SpeechRecognition;
-    webkitSpeechRecognition: new () => SpeechRecognition;
-  }
-}
-
 export type VoiceCommand =
   | 'next'
   | 'previous'
@@ -63,7 +20,7 @@ export function useVoice({ onCommand, language = 'es-MX', continuous = true }: U
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any | null>(null);
 
   useEffect(() => {
     // Check if Speech Recognition is supported
@@ -77,7 +34,7 @@ export function useVoice({ onCommand, language = 'es-MX', continuous = true }: U
         recognition.interimResults = true;
         recognition.lang = language;
 
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
+        recognition.onresult = (event: any) => {
           const results = event.results;
           const lastResult = results[results.length - 1];
           const transcriptText = lastResult[0].transcript.toLowerCase().trim();

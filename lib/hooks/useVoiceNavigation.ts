@@ -3,29 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { parseNavigationCommand, NavigationRoute } from "@/lib/voice/navigationCommands";
-import { executeFunctionRequest, type FunctionRequest } from "@/lib/voice/clientFunctionExecutor";
 
-export type VoiceStatus = "disconnected" | "connecting" | "listening" | "thinking" | "processing" | "executing_function" | "error";
+export type VoiceStatus = "disconnected" | "listening" | "thinking" | "processing" | "error";
 
-type ErrorType = "websocket" | "voice_server" | "nextjs_api" | "lm_studio" | "function_error" | "unknown";
-
-interface WebSocketMessage {
-  type: "connected" | "transcript" | "partial" | "wake_word_detected" | "command" | "navigation" | "thinking" | "llm_response" | "pong" | "error" | "function_request" | "executing_functions";
-  text?: string;
-  command?: string;
-  route?: string;
-  message?: string;
-  question?: string;
-  response?: string;
-  error_type?: ErrorType;
-  error_message?: string;
-  // Para function_request
-  request_id?: string;
-  function_name?: string;
-  args?: Record<string, unknown>;
-  // Para executing_functions
-  functions?: string[];
-}
+type ErrorType = "browser_not_supported" | "microphone_denied" | "unknown";
 
 export interface LLMResponse {
   question: string;
@@ -71,34 +52,25 @@ export interface VoiceContext {
   sessionId?: string | null;
 }
 
-const WS_URL = "ws://localhost:8765/ws";
-
 // Helper para crear errores con sugerencias
 function createVoiceError(type: ErrorType, message?: string): VoiceError {
+  // Detectar si es móvil para mensajes específicos
+  const isMobile = typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
   const errors: Record<ErrorType, { message: string; suggestion: string }> = {
-    websocket: {
-      message: message || "No se puede conectar al servidor de voz",
-      suggestion: "Ejecuta: cd voice-server && python start_api.py"
+    browser_not_supported: {
+      message: message || "Tu navegador no soporta reconocimiento de voz",
+      suggestion: "Usa Chrome, Edge o Safari para usar el asistente de voz"
     },
-    voice_server: {
-      message: message || "Error en el servidor de voz",
-      suggestion: "Verifica que el micrófono esté conectado y el modelo Vosk esté instalado"
-    },
-    nextjs_api: {
-      message: message || "No se puede conectar a la API del asistente",
-      suggestion: "Verifica que Next.js esté corriendo en puerto 3000"
-    },
-    lm_studio: {
-      message: message || "No se puede conectar con LM Studio",
-      suggestion: "Abre LM Studio y carga un modelo en el puerto 1234"
-    },
-    function_error: {
-      message: message || "Error al ejecutar una función",
-      suggestion: "Intenta reformular tu pregunta"
+    microphone_denied: {
+      message: message || "Acceso al micrófono denegado",
+      suggestion: isMobile
+        ? "En móvil: Toca el botón del micrófono para activar. Si no funciona, verifica permisos en Ajustes > Safari/Chrome > Micrófono"
+        : "Permite el acceso al micrófono en la configuración del navegador"
     },
     unknown: {
       message: message || "Error técnico desconocido",
-      suggestion: "Revisa la consola para más detalles"
+      suggestion: "Revisa la consola para más detalles o recarga la página"
     }
   };
 
@@ -117,51 +89,164 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
   const [lastNavigation, setLastNavigation] = useState<NavigationRoute | null>(null);
   const [llmResponse, setLlmResponse] = useState<LLMResponse | null>(null);
   const [error, setError] = useState<VoiceError | null>(null);
-  const [executingFunction, setExecutingFunction] = useState<string | null>(null);
+  const [executingFunction] = useState<string | null>(null);
+  const [currentContext, setCurrentContext] = useState<VoiceContext>({});
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const autoConnectAttempted = useRef(false);
+  const recognitionRef = useRef<any | null>(null);
+  const isListeningRef = useRef(false);
+  const wakeWordDetectedRef = useRef(false);
 
-  // Actualizar contexto en el servidor
+  // Actualizar contexto (ahora solo local, no enviamos a servidor)
   const updateContext = useCallback((context: VoiceContext) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: "update_context",
-        context,
-      }));
+    setCurrentContext(context);
+    console.log("[Voice] Context updated:", context);
+  }, []);
+
+  // Detectar palabra de activación "Rem-E"
+  const detectWakeWord = useCallback((text: string): boolean => {
+    const lowerText = text.toLowerCase().trim();
+    return lowerText.includes('reme') ||
+           lowerText.includes('rem e') ||
+           lowerText.includes('remi') ||
+           lowerText.startsWith('reme') ||
+           lowerText.startsWith('rem e');
+  }, []);
+
+  // Extraer comando después de la palabra de activación
+  const extractCommand = useCallback((text: string): string => {
+    const lowerText = text.toLowerCase();
+    // Buscar "Rem-E" y tomar todo lo que viene después
+    const patterns = ['reme', 'rem e', 'remi'];
+    for (const pattern of patterns) {
+      const index = lowerText.indexOf(pattern);
+      if (index !== -1) {
+        const command = text.substring(index + pattern.length).trim();
+        return command;
+      }
     }
+    return text;
+  }, []);
+
+  // Detectar comandos de cocina
+  const detectCookingCommand = useCallback((text: string): string | null => {
+    const lowerText = text.toLowerCase();
+
+    // Comandos de navegación de pasos
+    if (lowerText.includes('siguiente') || lowerText.includes('continuar')) {
+      return 'siguiente';
+    }
+    if (lowerText.includes('anterior') || lowerText.includes('atrás')) {
+      return 'anterior';
+    }
+    if (lowerText.includes('repetir') || lowerText.includes('repite')) {
+      return 'repetir';
+    }
+    if (lowerText.includes('pausar') || lowerText.includes('pausa')) {
+      return 'pausar';
+    }
+    if (lowerText.includes('reanudar') || lowerText.includes('continúa')) {
+      return 'reanudar';
+    }
+
+    // Comando de timer
+    if (lowerText.includes('timer') || lowerText.includes('temporizador') || lowerText.includes('cronómetro')) {
+      return 'timer';
+    }
+
+    return null;
   }, []);
 
   // Procesar comando de navegación
   const processNavigation = useCallback(
-    (command: string, routeFromServer?: string) => {
-      if (!command && !routeFromServer) return;
+    (command: string) => {
+      if (!command) return;
 
       setLastCommand(command);
       setStatus("processing");
       setLlmResponse(null);
 
-      // Si el servidor ya calculó la ruta, usarla directamente
-      if (routeFromServer) {
-        const route = { path: routeFromServer, name: command, keywords: [] };
+      // Parsear comando de navegación
+      const route = parseNavigationCommand(command);
+      if (route) {
         setLastNavigation(route);
-        router.push(routeFromServer);
+        router.push(route.path);
       } else {
-        // Fallback: parsear localmente
-        const route = parseNavigationCommand(command);
-        if (route) {
-          setLastNavigation(route);
-          router.push(route.path);
-        } else {
-          setLastNavigation(null);
-        }
+        setLastNavigation(null);
       }
 
       // Volver a estado de escucha
-      setTimeout(() => setStatus("listening"), 500);
+      setTimeout(() => {
+        setStatus("listening");
+        wakeWordDetectedRef.current = false;
+      }, 500);
     },
     [router]
+  );
+
+  // Procesar comando de cocina
+  const processCookingCommand = useCallback((cookingCmd: string, originalText: string) => {
+    console.log("[Voice] Comando de cocina detectado:", cookingCmd);
+    window.dispatchEvent(new CustomEvent('cooking-command', {
+      detail: {
+        command: cookingCmd,
+        originalText
+      }
+    }));
+    setStatus("listening");
+    wakeWordDetectedRef.current = false;
+  }, []);
+
+  // Manejar resultado de reconocimiento de voz
+  const handleRecognitionResult = useCallback(
+    (event: any) => {
+      const results = event.results;
+      const lastResult = results[results.length - 1];
+      const transcriptText = lastResult[0].transcript;
+
+      console.log("[Voice] Transcript:", transcriptText, "isFinal:", lastResult.isFinal);
+
+      // Actualizar transcript en tiempo real
+      setTranscript(transcriptText);
+
+      // Solo procesar comandos finales
+      if (lastResult.isFinal) {
+        // Si estamos en una receta, primero intentar detectar comandos de cocina
+        if (currentContext.inRecipeGuide) {
+          const cookingCmd = detectCookingCommand(transcriptText);
+          if (cookingCmd) {
+            processCookingCommand(cookingCmd, transcriptText);
+            setTranscript("");
+            return;
+          }
+        }
+
+        // Si aún no detectamos palabra de activación, buscarla
+        if (!wakeWordDetectedRef.current) {
+          if (detectWakeWord(transcriptText)) {
+            wakeWordDetectedRef.current = true;
+            const command = extractCommand(transcriptText);
+
+            if (command) {
+              // Si hay comando inmediatamente después de wake word, procesarlo
+              console.log("[Voice] Wake word detected with command:", command);
+              setLastCommand(command);
+              processNavigation(command);
+            } else {
+              // Solo wake word, esperar comando
+              console.log("[Voice] Wake word detected, waiting for command");
+              setLastCommand("(esperando comando...)");
+            }
+            setTranscript("");
+          }
+        } else {
+          // Ya detectamos wake word, este es el comando
+          console.log("[Voice] Processing command after wake word:", transcriptText);
+          processNavigation(transcriptText);
+          setTranscript("");
+        }
+      }
+    },
+    [detectWakeWord, extractCommand, processNavigation, detectCookingCommand, processCookingCommand, currentContext.inRecipeGuide]
   );
 
   // Limpiar respuesta del LLM
@@ -175,217 +260,158 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
     setError(null);
   }, []);
 
-  // Manejar mensajes del WebSocket
-  const handleMessage = useCallback(
-    (event: MessageEvent) => {
-      try {
-        const data: WebSocketMessage = JSON.parse(event.data);
+  // Conectar (iniciar reconocimiento de voz)
+  const connect = useCallback(async () => {
+    if (typeof window === 'undefined') return;
 
-        switch (data.type) {
-          case "connected":
-            setStatus("listening");
-            setError(null);
-            break;
+    // Verificar si estamos en contexto seguro (HTTPS o localhost)
+    const isSecureContext = window.isSecureContext;
+    if (!isSecureContext) {
+      console.error("[Voice] Not in secure context (HTTPS required)");
+      setError(createVoiceError("unknown", "Se requiere HTTPS para usar el micrófono. Accede desde https:// o localhost"));
+      setStatus("error");
+      return;
+    }
 
-          case "partial":
-            setTranscript(data.text || "");
-            break;
+    // Verificar soporte del navegador
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-          case "transcript":
-            setTranscript(data.text || "");
-            break;
+    if (!SpeechRecognitionAPI) {
+      setError(createVoiceError("browser_not_supported"));
+      setStatus("error");
+      return;
+    }
 
-          case "wake_word_detected":
-            setTranscript(data.text || "");
-            setLlmResponse(null);
-            if (data.command) {
-              setLastCommand(data.command);
-            } else {
-              setLastCommand("(esperando comando...)");
-            }
-            break;
+    if (isListeningRef.current) {
+      console.log("[Voice] Already listening");
+      return;
+    }
 
-          case "navigation":
-            // Comando de navegación desde el servidor
-            if (data.command || data.route) {
-              processNavigation(data.command || "", data.route);
-            }
-            break;
+    // IMPORTANTE: En tablets/móviles, solicitar permisos EXPLÍCITAMENTE primero
+    // Esto fuerza al navegador a mostrar el diálogo de permisos
+    try {
+      console.log("[Voice] Requesting microphone permission...");
+      console.log("[Voice] Current URL:", window.location.href);
+      console.log("[Voice] Is secure context:", isSecureContext);
 
-          default:
-            // Check if it's a cooking command
-            if ((data as any).type === "cooking_command") {
-              console.log("[Voice] Comando de cocina recibido:", (data as any).command);
-              window.dispatchEvent(new CustomEvent('cooking-command', {
-                detail: {
-                  command: (data as any).command,
-                  originalText: (data as any).original_text
-                }
-              }));
-              setStatus("listening");
-            }
-            break;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-          case "thinking":
-            // El LLM está procesando
-            setStatus("thinking");
-            setLastNavigation(null);
-            break;
-
-          case "llm_response":
-            // Respuesta del LLM
-            setStatus("listening");
-            setLlmResponse({
-              question: data.question || "",
-              response: data.response || "",
-              timestamp: Date.now(),
-            });
-            break;
-
-          case "command":
-            // Compatibilidad con versión anterior
-            if (data.command) {
-              processNavigation(data.command);
-            }
-            break;
-
-          case "error":
-            // Error específico del servidor
-            console.error("[Voice] Error recibido:", data.error_type, data.error_message);
-            setStatus("error");
-            setExecutingFunction(null);
-            setError(createVoiceError(
-              data.error_type || "unknown",
-              data.error_message
-            ));
-            break;
-
-          case "executing_functions":
-            // El servidor va a ejecutar funciones
-            setStatus("executing_function");
-            if (data.functions && data.functions.length > 0) {
-              setExecutingFunction(data.functions[0]);
-            }
-            break;
-
-          case "function_request":
-            // El servidor solicita ejecutar una función en el cliente
-            if (data.request_id && data.function_name) {
-              console.log(`[Voice] Ejecutando función: ${data.function_name}`, data.args);
-              setStatus("executing_function");
-              setExecutingFunction(data.function_name);
-
-              const request: FunctionRequest = {
-                requestId: data.request_id,
-                functionName: data.function_name,
-                args: data.args || {},
-              };
-
-              // Ejecutar la función y enviar resultado
-              executeFunctionRequest(request)
-                .then((response) => {
-                  if (wsRef.current?.readyState === WebSocket.OPEN) {
-                    wsRef.current.send(JSON.stringify({
-                      type: "function_response",
-                      request_id: response.requestId,
-                      result: response.result,
-                    }));
-                    console.log(`[Voice] Función completada: ${data.function_name}`, response.result);
-                  }
-                })
-                .catch((err) => {
-                  console.error(`[Voice] Error ejecutando función: ${data.function_name}`, err);
-                  if (wsRef.current?.readyState === WebSocket.OPEN) {
-                    wsRef.current.send(JSON.stringify({
-                      type: "function_response",
-                      request_id: data.request_id,
-                      result: {
-                        success: false,
-                        error: err instanceof Error ? err.message : "Error desconocido",
-                      },
-                    }));
-                  }
-                })
-                .finally(() => {
-                  setExecutingFunction(null);
-                });
-            }
-            break;
-        }
-      } catch (e) {
-        console.error("Error parsing WebSocket message:", e);
-      }
-    },
-    [processNavigation]
-  );
-
-  // Conectar al servidor WebSocket
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
-    setStatus("connecting");
-    setError(null);
+      // Inmediatamente detener el stream, solo lo usamos para obtener permisos
+      stream.getTracks().forEach(track => track.stop());
+      console.log("[Voice] Microphone permission granted");
+    } catch (permError: any) {
+      console.error("[Voice] Microphone permission denied:", permError);
+      setError(createVoiceError("microphone_denied", permError.message));
+      setStatus("error");
+      return;
+    }
 
     try {
-      const ws = new WebSocket(WS_URL);
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'es-MX';
 
-      ws.onopen = () => {
-        console.log("Conectado al servidor de voz Rem-E");
-        setStatus("listening");
-        setError(null);
+      recognition.onresult = handleRecognitionResult;
+
+      recognition.onerror = (event: any) => {
+        console.error('[Voice] Speech recognition error:', event.error);
+
+        if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+          setError(createVoiceError("microphone_denied"));
+          setStatus("error");
+          isListeningRef.current = false;
+        } else if (event.error === 'no-speech') {
+          // No es un error real, solo continuar
+          console.log("[Voice] No speech detected, continuing...");
+          // No cambiar el estado, permitir que siga escuchando
+        } else if (event.error === 'aborted') {
+          // Usuario canceló o navegador bloqueó
+          console.log("[Voice] Recognition aborted");
+          setStatus("disconnected");
+          isListeningRef.current = false;
+        } else {
+          setError(createVoiceError("unknown", `Error: ${event.error}`));
+          setStatus("error");
+          isListeningRef.current = false;
+        }
       };
 
-      ws.onmessage = handleMessage;
+      recognition.onend = () => {
+        console.log("[Voice] Recognition ended");
+        isListeningRef.current = false;
 
-      ws.onerror = () => {
-        setError(createVoiceError("websocket"));
-        setStatus("error");
+        // Auto-restart si no hay error
+        if (status !== "error" && status !== "disconnected") {
+          setTimeout(() => {
+            if (recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+                isListeningRef.current = true;
+                console.log("[Voice] Auto-restarted recognition");
+              } catch (err) {
+                console.error("[Voice] Error auto-restarting:", err);
+              }
+            }
+          }, 100);
+        }
       };
 
-      ws.onclose = () => {
-        setStatus("disconnected");
-        wsRef.current = null;
-
-        // Intentar reconectar en 3 segundos
-        reconnectTimeoutRef.current = setTimeout(() => {
-          console.log("Intentando reconectar...");
-          connect();
-        }, 3000);
-      };
-
-      wsRef.current = ws;
-    } catch {
-      setError(createVoiceError("websocket"));
+      recognitionRef.current = recognition;
+      recognition.start();
+      isListeningRef.current = true;
+      wakeWordDetectedRef.current = false;
+      setStatus("listening");
+      setError(null);
+      console.log("[Voice] Started listening");
+    } catch (err) {
+      console.error('[Voice] Error starting recognition:', err);
+      setError(createVoiceError("unknown", String(err)));
       setStatus("error");
+      isListeningRef.current = false;
     }
-  }, [handleMessage]);
+  }, [handleRecognitionResult, status]);
 
-  // Desconectar
+  // Desconectar (detener reconocimiento de voz)
   const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      } catch (err) {
+        console.error("[Voice] Error stopping recognition:", err);
+      }
     }
-
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-
+    isListeningRef.current = false;
+    wakeWordDetectedRef.current = false;
     setStatus("disconnected");
+    setTranscript("");
+    console.log("[Voice] Disconnected");
   }, []);
 
-  // Auto-conectar al montar
+  // Auto-conectar al montar SOLO en desktop
+  // En móvil REQUIERE interacción del usuario
   useEffect(() => {
-    const timer = setTimeout(() => {
-      connect();
-    }, 500);
+    // Detectar si es móvil
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
+    if (!isMobile) {
+      // Solo auto-conectar en desktop
+      const timer = setTimeout(() => {
+        connect();
+      }, 500);
+
+      return () => {
+        clearTimeout(timer);
+        disconnect();
+      };
+    }
+
+    // En móvil, solo cleanup al desmontar
     return () => {
-      clearTimeout(timer);
       disconnect();
     };
-  }, [connect, disconnect]);
+  }, []); // Solo al montar/desmontar
 
   return {
     status,

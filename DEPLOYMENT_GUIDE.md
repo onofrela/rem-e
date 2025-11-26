@@ -1,180 +1,70 @@
-# 🚀 Guía de Despliegue - Rem-E Voice API
+# 🚀 Guía de Despliegue - Rem-E
 
-Esta guía explica cómo exponer tu servidor de voz y LLM para acceso desde cualquier lugar.
+Esta guía explica cómo desplegar Rem-E para acceso desde cualquier lugar.
 
 ---
 
 ## 📋 Requisitos Previos
 
-1. ✅ Servidor de voz configurado (`voice-server/`)
-2. ✅ LM Studio corriendo con servidor local (`http://localhost:1234`)
-3. ✅ Python 3.8+ con dependencias instaladas
-4. ✅ PC encendida y conectada a internet
+1. ✅ Aplicación Next.js configurada
+2. ✅ Node.js 18+ instalado
+3. ✅ (Opcional) LM Studio corriendo para reconocimiento de ingredientes
 
 ---
 
-## 🌐 Opción 1: Ngrok (Recomendado)
+## 🌐 Opción 1: Vercel (Recomendado)
 
-### ¿Qué es Ngrok?
+La forma más fácil de desplegar Rem-E es usando Vercel.
 
-Ngrok es un servicio que crea un túnel seguro entre internet y tu servidor local. Es perfecto para:
-- 🧪 Desarrollo y pruebas
-- 📱 Demos y presentaciones
-- 🔒 Conexión segura sin configurar router
-
-### Paso 1: Instalar Ngrok
-
-#### Windows:
-1. Descarga desde: https://ngrok.com/download
-2. Extrae el archivo `ngrok.exe` en una carpeta (ej: `C:\ngrok\`)
-3. Agrega la carpeta al PATH o usa la ruta completa
-
-#### Linux/Mac:
-```bash
-# Con Homebrew (Mac)
-brew install ngrok
-
-# Con apt (Linux)
-curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-sudo apt update && sudo apt install ngrok
-```
-
-### Paso 2: Crear Cuenta (Gratis)
-
-1. Ve a https://dashboard.ngrok.com/signup
-2. Crea una cuenta gratuita
-3. Copia tu **authtoken** del dashboard
-
-### Paso 3: Autenticar
+### Paso 1: Preparar el Repositorio
 
 ```bash
-ngrok config add-authtoken TU_TOKEN_AQUI
+# Si aún no tienes git inicializado
+git init
+git add .
+git commit -m "Initial commit"
+
+# Crear repositorio en GitHub y subirlo
+git remote add origin https://github.com/tu-usuario/rem-e.git
+git push -u origin main
 ```
 
-### Paso 4: Configurar Ngrok
+### Paso 2: Desplegar en Vercel
 
-Crea un archivo de configuración para túneles múltiples:
+1. Ve a [vercel.com](https://vercel.com)
+2. Inicia sesión con tu cuenta de GitHub
+3. Haz clic en "New Project"
+4. Selecciona tu repositorio `rem-e`
+5. Configura las variables de entorno (opcional):
+   ```
+   AWS_REGION=us-east-1
+   AWS_ACCESS_KEY_ID=tu_key
+   AWS_SECRET_ACCESS_KEY=tu_secret
+   ```
+6. Haz clic en "Deploy"
 
-**Archivo: `ngrok.yml` (en la carpeta de ngrok o `~/.ngrok2/`)**
+¡Listo! Tu aplicación estará disponible en `https://tu-app.vercel.app`
 
-```yaml
-version: "2"
-authtoken: TU_TOKEN_AQUI
+### Actualizaciones Automáticas
 
-tunnels:
-  voice-api:
-    addr: 8765
-    proto: http
-    inspect: true
-    bind_tls: true
-
-  lm-studio:
-    addr: 1234
-    proto: http
-    inspect: true
-    bind_tls: true
-```
-
-### Paso 5: Iniciar los Servicios
-
-**1. Inicia LM Studio:**
-- Abre LM Studio
-- Carga un modelo
-- Ve a "Local Server" → "Start Server"
-- Verifica que corra en `http://localhost:1234`
-- ⚠️ **IMPORTANTE:** Habilita CORS en Settings
-
-**2. Inicia el Voice API Server:**
-
-```bash
-cd voice-server
-python voice_api_server.py
-```
-
-Deberías ver:
-```
-✓ Servidor de voz inicializado
-📡 API disponible en: http://0.0.0.0:8765
-```
-
-**3. Inicia Ngrok:**
-
-```bash
-ngrok start --all
-```
-
-O solo el túnel de voz:
-```bash
-ngrok http 8765
-```
-
-### Paso 6: Obtener URLs Públicas
-
-Ngrok te mostrará algo como:
-
-```
-Forwarding https://abc123.ngrok-free.app -> http://localhost:8765
-```
-
-**Copia estas URLs:**
-- Voice API: `https://abc123.ngrok-free.app`
-- LM Studio (si usas túnel doble): `https://xyz789.ngrok-free.app`
-
-### Paso 7: Configurar la Aplicación
-
-**Archivo: `.env.local`**
-
-```env
-# URL pública del Voice API
-NEXT_PUBLIC_VOICE_API_URL=https://abc123.ngrok-free.app
-
-# Si expones LM Studio también
-NEXT_PUBLIC_LM_STUDIO_URL=https://xyz789.ngrok-free.app
-
-# O mantén LM Studio local (recomendado)
-NEXT_PUBLIC_LM_STUDIO_URL=http://localhost:1234
-```
-
-### Paso 8: Actualizar el Cliente Web
-
-Actualiza el hook de voz para usar la nueva URL:
-
-**Archivo: `lib/hooks/useVoiceAPI.ts`**
-
-```typescript
-const VOICE_API_URL = process.env.NEXT_PUBLIC_VOICE_API_URL || 'http://localhost:8765';
-```
-
-### Paso 9: Probar la Conexión
-
-```bash
-# Prueba el endpoint de salud
-curl https://abc123.ngrok-free.app/health
-
-# Debería responder:
-# {"status":"healthy"}
-```
+Cada vez que hagas push a tu repositorio, Vercel desplegará automáticamente la nueva versión.
 
 ---
 
-## 🔐 Opción 2: Despliegue Directo (Producción)
+## 🏠 Opción 2: Self-Hosting con LM Studio
 
-Si quieres un despliegue permanente sin depender de Ngrok:
+Si quieres usar el reconocimiento de ingredientes con IA, necesitas mantener LM Studio corriendo localmente y exponerlo.
 
 ### Requisitos Adicionales
 
 1. **IP Pública o Dynamic DNS**
-   - Servicio recomendado: [No-IP](https://www.noip.com/) o [DuckDNS](https://www.duckdns.org/)
-   - Gratis para uso básico
+   - Servicio recomendado: [DuckDNS](https://www.duckdns.org/) (gratis)
 
 2. **Port Forwarding en Router**
-   - Redirigir puerto 8765 → tu PC
-   - Redirigir puerto 1234 → tu PC (si expones LM Studio)
+   - Redirigir puerto 1234 → tu PC (para LM Studio)
 
 3. **Certificado SSL**
    - Usar [Let's Encrypt](https://letsencrypt.org/) con Certbot
-   - O usar un proxy reverso como Nginx
 
 ### Configuración Paso a Paso
 
@@ -184,13 +74,13 @@ Si quieres un despliegue permanente sin depender de Ngrok:
 
 1. Ve a https://www.duckdns.org/
 2. Inicia sesión con Google/GitHub
-3. Crea un subdominio: `rem-e-voice.duckdns.org`
+3. Crea un subdominio: `rem-e-lm.duckdns.org`
 4. Instala el cliente de actualización
 
 **Windows:**
 ```powershell
 # Script para actualizar IP cada 5 minutos
-$url = "https://www.duckdns.org/update?domains=rem-e-voice&token=TU_TOKEN&ip="
+$url = "https://www.duckdns.org/update?domains=rem-e-lm&token=TU_TOKEN&ip="
 while($true) {
     Invoke-WebRequest -Uri $url
     Start-Sleep -Seconds 300
@@ -201,15 +91,12 @@ Guarda como `duckdns-updater.ps1` y ejecútalo al inicio.
 
 #### 2. Configurar Port Forwarding
 
-**Pasos generales (varía por router):**
-
 1. Accede a tu router (usualmente `http://192.168.1.1`)
 2. Busca "Port Forwarding" o "Virtual Server"
-3. Agrega estas reglas:
+3. Agrega esta regla:
 
 | Servicio       | Puerto Externo | Puerto Interno | Protocolo | IP Interna      |
 |----------------|----------------|----------------|-----------|-----------------|
-| Voice API      | 8765           | 8765           | TCP       | IP de tu PC     |
 | LM Studio      | 1234           | 1234           | TCP       | IP de tu PC     |
 
 **Encontrar IP de tu PC:**
@@ -221,23 +108,15 @@ ipconfig
 ifconfig
 ```
 
-Busca algo como `192.168.1.100`
-
 #### 3. Configurar Firewall
 
 **Windows Firewall:**
-
 ```powershell
-# Permitir Voice API
-netsh advfirewall firewall add rule name="Rem-E Voice API" dir=in action=allow protocol=TCP localport=8765
-
-# Permitir LM Studio
 netsh advfirewall firewall add rule name="LM Studio API" dir=in action=allow protocol=TCP localport=1234
 ```
 
 **Linux (UFW):**
 ```bash
-sudo ufw allow 8765/tcp
 sudo ufw allow 1234/tcp
 ```
 
@@ -248,247 +127,116 @@ sudo ufw allow 1234/tcp
 ```bash
 # Ubuntu/Debian
 sudo apt install nginx certbot python3-certbot-nginx
-
-# Windows: Descargar de nginx.org
 ```
 
 **Configuración de Nginx:**
 
-**Archivo: `/etc/nginx/sites-available/rem-e-voice`**
-
 ```nginx
 server {
     listen 80;
-    server_name rem-e-voice.duckdns.org;
-
-    location / {
-        proxy_pass http://localhost:8765;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-
-server {
-    listen 80;
-    server_name lm-studio.duckdns.org;
+    server_name rem-e-lm.duckdns.org;
 
     location / {
         proxy_pass http://localhost:1234;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+
+        # CORS headers
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Content-Type' always;
     }
 }
 ```
 
-**Habilitar sitio:**
-```bash
-sudo ln -s /etc/nginx/sites-available/rem-e-voice /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
 **Obtener certificado SSL:**
 ```bash
-sudo certbot --nginx -d rem-e-voice.duckdns.org -d lm-studio.duckdns.org
+sudo certbot --nginx -d rem-e-lm.duckdns.org
 ```
 
-Certbot configurará automáticamente HTTPS.
+#### 5. Configurar Variables de Entorno
 
-#### 5. Configurar Servicio Systemd (Linux)
-
-**Archivo: `/etc/systemd/system/rem-e-voice.service`**
-
-```ini
-[Unit]
-Description=Rem-E Voice API Server
-After=network.target
-
-[Service]
-Type=simple
-User=tu-usuario
-WorkingDirectory=/ruta/a/rem-e/voice-server
-ExecStart=/usr/bin/python3 voice_api_server.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Habilitar servicio:**
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable rem-e-voice
-sudo systemctl start rem-e-voice
-```
-
-#### 6. Actualizar Variables de Entorno
-
-**Archivo: `.env.local`**
+En tu aplicación desplegada (Vercel/Netlify), agrega:
 
 ```env
-NEXT_PUBLIC_VOICE_API_URL=https://rem-e-voice.duckdns.org
-NEXT_PUBLIC_LM_STUDIO_URL=https://lm-studio.duckdns.org
+NEXT_PUBLIC_LM_STUDIO_URL=https://rem-e-lm.duckdns.org
 ```
+
+---
+
+## 📱 Opción 3: PWA (Progressive Web App)
+
+Rem-E ya está configurado como PWA. Los usuarios pueden:
+
+1. Abrir la app en Chrome/Safari
+2. Ir a menú → "Instalar aplicación" o "Agregar a pantalla de inicio"
+3. La app funcionará como aplicación nativa
+
+**Características PWA:**
+- ✅ Funciona offline (excepto reconocimiento de voz)
+- ✅ Se instala en el dispositivo
+- ✅ Icono en pantalla de inicio
+- ✅ Funciona sin conexión a internet (funciones básicas)
 
 ---
 
 ## 🔒 Seguridad
 
-### Autenticación (Recomendado para Producción)
+### Para Producción
 
-Agrega autenticación básica al Voice API:
+Si expones LM Studio públicamente, considera:
 
-**Archivo: `voice-server/auth.py`**
+1. **Autenticación básica con Nginx:**
 
-```python
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import secrets
+```nginx
+server {
+    # ... configuración anterior ...
 
-# Token de API (guárdalo en variable de entorno)
-API_TOKEN = "tu-token-secreto-aqui-genera-uno-seguro"
+    location / {
+        auth_basic "Restricted Access";
+        auth_basic_user_file /etc/nginx/.htpasswd;
 
-security = HTTPBearer()
-
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if not secrets.compare_digest(credentials.credentials, API_TOKEN):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido"
-        )
-    return credentials.credentials
+        proxy_pass http://localhost:1234;
+        # ... resto de la configuración ...
+    }
+}
 ```
 
-**Actualizar `voice_api_server.py`:**
-
-```python
-from auth import verify_token
-
-@app.post("/api/command", dependencies=[Depends(verify_token)])
-async def process_command(request: CommandRequest):
-    # ... resto del código
-```
-
-**Actualizar cliente:**
-
-```typescript
-const response = await fetch(`${VOICE_API_URL}/api/command`, {
-  headers: {
-    'Authorization': 'Bearer tu-token-secreto-aqui'
-  }
-});
-```
-
-### Rate Limiting
-
-Instala:
+Crear usuario:
 ```bash
-pip install slowapi
+sudo htpasswd -c /etc/nginx/.htpasswd usuario
 ```
 
-Agrega a `voice_api_server.py`:
+2. **Rate Limiting:**
 
-```python
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+```nginx
+http {
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/m;
 
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-@app.post("/api/command")
-@limiter.limit("10/minute")  # 10 requests por minuto
-async def process_command(request: Request, cmd: CommandRequest):
-    # ... resto del código
+    server {
+        location / {
+            limit_req zone=api burst=5;
+            # ... resto de la configuración ...
+        }
+    }
+}
 ```
 
 ---
 
 ## 📊 Monitoreo
 
-### Logs
-
-El servidor ya tiene logging básico. Para producción, considera:
-
-```python
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('voice_api.log'),
-        logging.StreamHandler()
-    ]
-)
-```
-
 ### Uptime Monitoring
 
-Usa servicios gratuitos como:
+Usa servicios gratuitos:
 - [UptimeRobot](https://uptimerobot.com/) - Monitorea cada 5 minutos
-- [Healthchecks.io](https://healthchecks.io/) - Notificaciones si el servidor cae
+- [Healthchecks.io](https://healthchecks.io/) - Notificaciones si el servicio cae
 
----
+### Analytics
 
-## 🐳 Bonus: Docker (Opcional)
-
-Si quieres contenerizar tu aplicación:
-
-**Archivo: `voice-server/Dockerfile`**
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Instalar dependencias del sistema
-RUN apt-get update && apt-get install -y \
-    portaudio19-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copiar requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copiar código
-COPY . .
-
-# Exponer puerto
-EXPOSE 8765
-
-# Comando de inicio
-CMD ["python", "voice_api_server.py"]
-```
-
-**Archivo: `docker-compose.yml`**
-
-```yaml
-version: '3.8'
-
-services:
-  voice-api:
-    build: ./voice-server
-    ports:
-      - "8765:8765"
-    volumes:
-      - ./voice-server:/app
-    restart: unless-stopped
-    environment:
-      - LM_STUDIO_URL=http://host.docker.internal:1234
-```
-
-**Ejecutar:**
-```bash
-docker-compose up -d
-```
+Para Next.js en Vercel:
+- Analytics está incluido automáticamente
+- Verifica en el dashboard de Vercel
 
 ---
 
@@ -496,81 +244,81 @@ docker-compose up -d
 
 ### Antes de Desplegar:
 
-- [ ] LM Studio configurado y corriendo
-- [ ] CORS habilitado en LM Studio
-- [ ] Voice API funciona localmente
-- [ ] Dependencias de Python instaladas
-- [ ] Firewall configurado
-- [ ] Dynamic DNS configurado (si usas opción 2)
-- [ ] Port forwarding configurado (si usas opción 2)
+- [ ] Código en repositorio Git
+- [ ] Variables de entorno configuradas
+- [ ] PWA configurado (manifest.json)
+- [ ] Pruebas locales pasando
+- [ ] LM Studio configurado (si se usa)
 
 ### Después de Desplegar:
 
-- [ ] Probar endpoint `/health`
-- [ ] Probar endpoint `/status`
-- [ ] Probar comando de voz desde cliente remoto
-- [ ] Verificar logs del servidor
-- [ ] Configurar monitoreo de uptime
+- [ ] Probar la URL pública
+- [ ] Verificar reconocimiento de voz
+- [ ] Probar instalación como PWA
+- [ ] Verificar funcionalidad offline
+- [ ] Configurar monitoreo
 - [ ] Documentar URL pública
-- [ ] Configurar backups de datos (si hay persistencia)
-
----
-
-## ❓ Troubleshooting
-
-### "Connection refused"
-- Verifica que el servidor esté corriendo
-- Revisa firewall local y de router
-- Confirma que el puerto esté abierto: `telnet tu-ip 8765`
-
-### "CORS error"
-- Asegúrate que LM Studio tiene CORS habilitado
-- Verifica que FastAPI tenga CORS configurado (ya está en el código)
-
-### "Model not loaded"
-- Abre LM Studio y carga un modelo manualmente
-- Verifica que el servidor de LM Studio esté activo
-
-### Ngrok: "Session expired"
-- Plan gratuito tiene sesiones de 8 horas
-- Reinicia ngrok para nueva sesión
-- Considera plan de pago para sesiones ilimitadas
 
 ---
 
 ## 💰 Costos Estimados
 
-### Opción 1: Ngrok
-- **Gratis:** Sesiones de 8h, 1 túnel, URL aleatoria
-- **Básico ($8/mes):** Sesiones ilimitadas, 3 túneles, subdominios fijos
-- **Pro ($20/mes):** IP reservada, más túneles
+### Opción 1: Vercel + Web Speech API
+- **Hosting:** Gratis (plan Hobby)
+- **Voz:** Gratis (Web Speech API del navegador)
+- **Total:** $0/mes
 
-### Opción 2: Despliegue Directo
-- **Dynamic DNS:** Gratis (DuckDNS, No-IP)
+### Opción 2: Vercel + Self-Hosted LM Studio
+- **Hosting:** Gratis (Vercel Hobby)
+- **Dynamic DNS:** Gratis (DuckDNS)
 - **Electricidad:** ~$5-10/mes (PC 24/7)
-- **Internet:** Ya tienes
-- **Certificado SSL:** Gratis (Let's Encrypt)
+- **SSL:** Gratis (Let's Encrypt)
+- **Total:** $5-10/mes
 
-**Total:** $0-10/mes
+---
+
+## ❓ Troubleshooting
+
+### "CORS error" al usar LM Studio
+- Asegúrate que Nginx tiene headers CORS configurados
+- Verifica que LM Studio tenga CORS habilitado
+
+### Reconocimiento de voz no funciona
+- Verifica que usas HTTPS (requerido para Web Speech API)
+- Permite acceso al micrófono en el navegador
+- Usa Chrome, Edge o Safari
+
+### PWA no se instala
+- Verifica que la app esté en HTTPS
+- Revisa que `manifest.json` esté correctamente configurado
+- Limpia caché del navegador
 
 ---
 
 ## 📚 Recursos Adicionales
 
-- [Ngrok Documentation](https://ngrok.com/docs)
-- [FastAPI Deployment](https://fastapi.tiangolo.com/deployment/)
-- [Let's Encrypt Guide](https://letsencrypt.org/getting-started/)
+- [Vercel Documentation](https://vercel.com/docs)
+- [Next.js Deployment](https://nextjs.org/docs/deployment)
+- [PWA Guide](https://web.dev/progressive-web-apps/)
 - [DuckDNS Setup](https://www.duckdns.org/install.jsp)
-- [Nginx Configuration](https://nginx.org/en/docs/)
+- [Let's Encrypt Guide](https://letsencrypt.org/getting-started/)
 
 ---
 
-## 🎯 Siguiente Pasos
+## 🎯 Recomendaciones
 
-1. **Elige una opción** (Ngrok para empezar, Directo para producción)
-2. **Sigue los pasos** de esta guía
-3. **Prueba la conexión** remota
-4. **Configura monitoreo** para detectar caídas
-5. **Documenta tu setup** para futuras referencias
+### Para Desarrollo/Testing
+✅ **Opción 1: Vercel** - Rápido, gratis, sin configuración
+
+### Para Producción Personal
+✅ **Opción 1 + PWA** - Lo mejor de ambos mundos
+
+### Para Uso con IA de Ingredientes
+✅ **Opción 2: Vercel + LM Studio self-hosted**
+
+### Para Máxima Simplicidad
+✅ **Solo Web Speech API** - Sin servidor Python, sin configuración extra
+
+---
 
 ¿Tienes dudas? Revisa la sección de Troubleshooting o abre un issue en el repo.

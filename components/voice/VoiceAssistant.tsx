@@ -71,8 +71,39 @@ export function VoiceAssistant() {
     }
   };
 
+  // Detectar si es móvil
+  const isMobile = typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  // Mostrar hint inicial en móvil cuando está disconnected (primera vez)
+  const showMobileHint = isMobile && status === "disconnected" && !error;
+
   return (
     <div className="fixed bottom-6 right-6 flex flex-col items-end gap-3 z-50">
+      {/* Hint inicial para móviles */}
+      {showMobileHint && (
+        <div
+          className="rounded-xl shadow-lg p-4 max-w-xs border animate-fadeInUp"
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            borderColor: 'var(--color-primary)',
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">👆</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
+                Control por voz en móvil
+              </p>
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                Toca el botón del micrófono para activar. Tu navegador te pedirá permiso para usar el micrófono.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Indicador de modo receta */}
       {isInGuide && recipe && (
         <div
@@ -153,12 +184,6 @@ export function VoiceAssistant() {
               Pensando...
             </p>
           )}
-          {status === "executing_function" && executingFunction && (
-            <p className="text-sm mt-1 flex items-center gap-2" style={{ color: 'var(--color-secondary)' }}>
-              <Database className="w-4 h-4 animate-pulse" />
-              Consultando: {getFunctionDisplayName(executingFunction)}
-            </p>
-          )}
         </div>
       )}
 
@@ -205,7 +230,7 @@ export function VoiceAssistant() {
 
       {/* Status indicator */}
       <div className="text-xs text-gray-500 text-center max-w-[140px] font-medium">
-        {getStatusText(status)}
+        {status === "disconnected" && isMobile ? "Toca para activar voz" : getStatusText(status)}
       </div>
     </div>
   );
@@ -220,8 +245,6 @@ function getButtonStyles(status: VoiceStatus): string {
     case "thinking":
       return baseStyles;
     case "processing":
-      return baseStyles;
-    case "connecting":
       return baseStyles;
     case "error":
       return `${baseStyles} hover:opacity-90`;
@@ -245,22 +268,10 @@ function getButtonInlineStyles(status: VoiceStatus): React.CSSProperties {
         borderColor: 'var(--color-secondary-dark)',
         color: 'white',
       };
-    case "executing_function":
-      return {
-        background: '#3B82F6',
-        borderColor: '#2563EB',
-        color: 'white',
-      };
     case "processing":
       return {
         background: 'var(--color-success)',
         borderColor: 'var(--color-success)',
-        color: 'white',
-      };
-    case "connecting":
-      return {
-        background: 'var(--color-warning)',
-        borderColor: 'var(--color-warning)',
         color: 'white',
       };
     case "error":
@@ -285,14 +296,10 @@ function getButtonIcon(status: VoiceStatus) {
       return <Mic className="w-7 h-7" />;
     case "thinking":
       return <Brain className="w-7 h-7 animate-pulse" />;
-    case "executing_function":
-      return <Database className="w-7 h-7 animate-pulse" />;
     case "processing":
       return <Loader2 className="w-7 h-7 animate-spin" />;
-    case "connecting":
-      return <Wifi className="w-7 h-7 animate-pulse" />;
     case "error":
-      return <WifiOff className="w-7 h-7" />;
+      return <MicOff className="w-7 h-7" />;
     case "disconnected":
     default:
       return <MicOff className="w-7 h-7" />;
@@ -305,10 +312,6 @@ function getButtonTitle(status: VoiceStatus): string {
       return "Desconectar asistente de voz";
     case "thinking":
       return "Procesando pregunta...";
-    case "executing_function":
-      return "Consultando datos...";
-    case "connecting":
-      return "Conectando al servidor...";
     case "error":
     case "disconnected":
       return "Conectar al asistente de voz";
@@ -323,14 +326,10 @@ function getStatusText(status: VoiceStatus): string {
       return 'Di "Rem-E" + comando';
     case "thinking":
       return "Consultando...";
-    case "executing_function":
-      return "Obteniendo datos...";
     case "processing":
       return "Navegando...";
-    case "connecting":
-      return "Conectando...";
     case "error":
-      return "Error de conexión";
+      return "Error de voz";
     case "disconnected":
       return "Asistente desactivado";
     default:
@@ -366,15 +365,12 @@ function getFunctionDisplayName(functionName: string): string {
 }
 
 // Helper functions para errores específicos
-type ErrorType = "websocket" | "voice_server" | "nextjs_api" | "lm_studio" | "function_error" | "unknown";
+type ErrorType = "browser_not_supported" | "microphone_denied" | "unknown";
 
 function getErrorBackground(type: ErrorType): string {
   const backgrounds: Record<ErrorType, string> = {
-    websocket: 'rgba(254, 242, 242, 0.95)',      // Rojo claro
-    voice_server: 'rgba(254, 243, 199, 0.95)',   // Amarillo claro
-    nextjs_api: 'rgba(254, 215, 170, 0.95)',     // Naranja claro
-    lm_studio: 'rgba(219, 234, 254, 0.95)',      // Azul claro
-    function_error: 'rgba(243, 232, 255, 0.95)', // Púrpura claro
+    browser_not_supported: 'rgba(254, 243, 199, 0.95)',   // Amarillo claro
+    microphone_denied: 'rgba(254, 242, 242, 0.95)',      // Rojo claro
     unknown: 'rgba(243, 244, 246, 0.95)',        // Gris claro
   };
   return backgrounds[type];
@@ -382,11 +378,8 @@ function getErrorBackground(type: ErrorType): string {
 
 function getErrorColor(type: ErrorType): string {
   const colors: Record<ErrorType, string> = {
-    websocket: '#DC2626',      // Rojo
-    voice_server: '#D97706',   // Amarillo oscuro
-    nextjs_api: '#EA580C',     // Naranja
-    lm_studio: '#2563EB',      // Azul
-    function_error: '#7C3AED', // Púrpura
+    browser_not_supported: '#D97706',   // Amarillo oscuro
+    microphone_denied: '#DC2626',      // Rojo
     unknown: '#4B5563',        // Gris
   };
   return colors[type];
@@ -394,11 +387,8 @@ function getErrorColor(type: ErrorType): string {
 
 function getErrorBorderColor(type: ErrorType): string {
   const borders: Record<ErrorType, string> = {
-    websocket: 'rgba(220, 38, 38, 0.3)',
-    voice_server: 'rgba(217, 119, 6, 0.3)',
-    nextjs_api: 'rgba(234, 88, 12, 0.3)',
-    lm_studio: 'rgba(37, 99, 235, 0.3)',
-    function_error: 'rgba(124, 58, 237, 0.3)',
+    browser_not_supported: 'rgba(217, 119, 6, 0.3)',
+    microphone_denied: 'rgba(220, 38, 38, 0.3)',
     unknown: 'rgba(75, 85, 99, 0.3)',
   };
   return borders[type];
@@ -407,16 +397,10 @@ function getErrorBorderColor(type: ErrorType): string {
 function getErrorIcon(type: ErrorType) {
   const iconClass = "w-5 h-5 flex-shrink-0 mt-0.5";
   switch (type) {
-    case "websocket":
-      return <WifiOff className={iconClass} />;
-    case "voice_server":
-      return <Mic className={iconClass} />;
-    case "nextjs_api":
-      return <Server className={iconClass} />;
-    case "lm_studio":
-      return <Brain className={iconClass} />;
-    case "function_error":
-      return <Database className={iconClass} />;
+    case "browser_not_supported":
+      return <AlertTriangle className={iconClass} />;
+    case "microphone_denied":
+      return <MicOff className={iconClass} />;
     default:
       return <AlertTriangle className={iconClass} />;
   }
@@ -424,11 +408,8 @@ function getErrorIcon(type: ErrorType) {
 
 function getErrorTitle(type: ErrorType): string {
   const titles: Record<ErrorType, string> = {
-    websocket: "Servidor de voz",
-    voice_server: "Reconocimiento de voz",
-    nextjs_api: "API del asistente",
-    lm_studio: "LM Studio",
-    function_error: "Error de función",
+    browser_not_supported: "Navegador no compatible",
+    microphone_denied: "Micrófono denegado",
     unknown: "Error técnico",
   };
   return titles[type];
