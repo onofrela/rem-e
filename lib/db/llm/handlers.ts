@@ -17,8 +17,10 @@ import * as historyService from '../services/historyService';
 import * as knowledgeService from '../services/knowledgeService';
 import * as adaptationService from '../services/adaptationService';
 import * as applianceAdaptationService from '../services/applianceAdaptationService';
+import { STORES, getAllItems } from '../stores/database';
 import type {
   SearchIngredientsParams,
+  RecipeHistory,
   GetInventoryParams,
   AddToInventoryParams,
   UpdateInventoryParams,
@@ -1778,12 +1780,10 @@ async function handleRecordApplianceAdaptation(args: Record<string, unknown>): P
 /**
  * Handles generateWeeklyMealPlan function call
  */
-async function handleGenerateWeeklyMealPlan(args: {
-  userPrompt: string;
-  availableRecipes: any[];
-  userInventory?: string[];
-}): Promise<FunctionResult> {
-  const { userPrompt, availableRecipes, userInventory = [] } = args;
+async function handleGenerateWeeklyMealPlan(args: Record<string, unknown>): Promise<FunctionResult> {
+  const userPrompt = args.userPrompt as string;
+  const availableRecipes = args.availableRecipes as any[];
+  const userInventory = (args.userInventory as string[]) || [];
 
   // This is a planning function - the actual generation is done by the LLM
   // We just return a structured prompt for the LLM to follow
@@ -1815,6 +1815,221 @@ async function handleGenerateWeeklyMealPlan(args: {
       instruction: 'Generate a JSON structure with weekly meals following the format: {lunes: {desayuno, almuerzo, comida, cena}, ...}',
     },
   };
+}
+
+// =============================================================================
+// MEAL PLANNING SEARCH HANDLERS
+// =============================================================================
+
+async function handleSearchRecipesForPlanning(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const tags = args.tags as string[] | undefined;
+    const excludeTags = args.excludeTags as string[] | undefined;
+    const maxCalories = args.maxCalories as number | undefined;
+    const minCalories = args.minCalories as number | undefined;
+    const maxTime = args.maxTime as number | undefined;
+    const difficulty = args.difficulty as RecipeDifficulty | undefined;
+    const mealType = args.mealType as string | undefined;
+    const limit = (args.limit as number) || 20;
+
+    // Get all recipes
+    const allRecipes = await recipeService.getAllRecipes();
+
+    // Apply filters
+    let filtered = allRecipes;
+
+    // Filter by required tags
+    if (tags && tags.length > 0) {
+      filtered = filtered.filter(r =>
+        tags.every(tag => r.tags.some(t => t.toLowerCase().includes(tag.toLowerCase())))
+      );
+    }
+
+    // Filter by excluded tags
+    if (excludeTags && excludeTags.length > 0) {
+      filtered = filtered.filter(r =>
+        !excludeTags.some(tag => r.tags.some(t => t.toLowerCase().includes(tag.toLowerCase())))
+      );
+    }
+
+    // Filter by calories
+    if (maxCalories !== undefined) {
+      filtered = filtered.filter(r => (r.nutritionPerServing?.calories || 0) <= maxCalories);
+    }
+    if (minCalories !== undefined) {
+      filtered = filtered.filter(r => (r.nutritionPerServing?.calories || 0) >= minCalories);
+    }
+
+    // Filter by time
+    if (maxTime !== undefined) {
+      filtered = filtered.filter(r => r.time <= maxTime);
+    }
+
+    // Filter by difficulty
+    if (difficulty) {
+      filtered = filtered.filter(r => r.difficulty === difficulty);
+    }
+
+    // Filter by meal type (based on tags/category)
+    if (mealType) {
+      filtered = filtered.filter(r =>
+        r.tags.some(t => t.toLowerCase().includes(mealType.toLowerCase())) ||
+        r.category.toLowerCase().includes(mealType.toLowerCase())
+      );
+    }
+
+    // Limit results
+    const results = filtered.slice(0, limit);
+
+    return {
+      success: true,
+      data: {
+        recipeIds: results.map(r => r.id),
+        count: results.length,
+        recipes: results.map(r => ({
+          id: r.id,
+          name: r.name,
+        })),
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Error searching recipes for planning: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
+}
+
+async function handleGetRecipeNameById(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const recipeId = args.recipeId as string;
+    const recipe = await recipeService.getRecipeById(recipeId);
+
+    if (!recipe) {
+      return {
+        success: false,
+        error: `Recipe ${recipeId} not found`,
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        id: recipe.id,
+        name: recipe.name,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Error getting recipe name: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
+}
+
+async function handleGetUserCookingHistory(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const limit = (args.limit as number) || 10;
+    const allHistory = await getAllItems<RecipeHistory>(STORES.RECIPE_HISTORY);
+
+    // Group by recipe
+    const historyMap = new Map<string, { count: number; ratings: number[] }>();
+    allHistory.forEach(h => {
+      if (!historyMap.has(h.recipeId)) {
+        historyMap.set(h.recipeId, { count: 0, ratings: [] });
+      }
+      const data = historyMap.get(h.recipeId)!;
+      data.count++;
+      if (h.rating) data.ratings.push(h.rating);
+    });
+
+    // Convert to array and sort
+    const historyArray = await Promise.all(
+      Array.from(historyMap.entries()).map(async ([recipeId, data]) => {
+        const recipe = await recipeService.getRecipeById(recipeId);
+        if (!recipe) return null;
+
+        const avgRating = data.ratings.length > 0
+          ? data.ratings.reduce((a, b) => a + b, 0) / data.ratings.length
+          : null;
+
+        return {
+          recipeId,
+          recipeName: recipe.name,
+          timesMade: data.count,
+          avgRating,
+        };
+      })
+    );
+
+    const sorted = historyArray
+      .filter(Boolean)
+      .sort((a, b) => b!.timesMade - a!.timesMade)
+      .slice(0, limit);
+
+    return {
+      success: true,
+      data: {
+        history: sorted,
+        totalRecipesMade: historyMap.size,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Error getting cooking history: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
+}
+
+async function handleGetRecipesByNutrition(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const maxCalories = args.maxCalories as number | undefined;
+    const minProtein = args.minProtein as number | undefined;
+    const maxCarbs = args.maxCarbs as number | undefined;
+    const maxFat = args.maxFat as number | undefined;
+    const limit = (args.limit as number) || 20;
+
+    const allRecipes = await recipeService.getAllRecipes();
+
+    let filtered = allRecipes;
+
+    if (maxCalories !== undefined) {
+      filtered = filtered.filter(r => (r.nutritionPerServing?.calories || 0) <= maxCalories);
+    }
+    if (minProtein !== undefined) {
+      filtered = filtered.filter(r => (r.nutritionPerServing?.protein || 0) >= minProtein);
+    }
+    if (maxCarbs !== undefined) {
+      filtered = filtered.filter(r => (r.nutritionPerServing?.carbs || 0) <= maxCarbs);
+    }
+    if (maxFat !== undefined) {
+      filtered = filtered.filter(r => (r.nutritionPerServing?.fat || 0) <= maxFat);
+    }
+
+    const results = filtered.slice(0, limit);
+
+    return {
+      success: true,
+      data: {
+        recipeIds: results.map(r => r.id),
+        count: results.length,
+        recipes: results.map(r => ({
+          id: r.id,
+          name: r.name,
+          calories: r.nutritionPerServing?.calories || 0,
+          protein: r.nutritionPerServing?.protein || 0,
+          carbs: r.nutritionPerServing?.carbs || 0,
+          fat: r.nutritionPerServing?.fat || 0,
+        })),
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Error searching recipes by nutrition: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
 }
 
 const handlers: Record<string, FunctionHandler> = {
@@ -1890,6 +2105,10 @@ const handlers: Record<string, FunctionHandler> = {
 
   // Meal planning handlers
   generateWeeklyMealPlan: handleGenerateWeeklyMealPlan,
+  searchRecipesForPlanning: handleSearchRecipesForPlanning,
+  getRecipeNameById: handleGetRecipeNameById,
+  getUserCookingHistory: handleGetUserCookingHistory,
+  getRecipesByNutrition: handleGetRecipesByNutrition,
 };
 
 /**

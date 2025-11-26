@@ -62,7 +62,7 @@ export const MealCard: React.FC<MealCardProps> = ({
         <div className="flex flex-wrap gap-1">
           <Badge variant="info" size="sm">⏱ {recipe.time}m</Badge>
           <Badge variant="success" size="sm">
-            {recipe.difficulty === 'Fácil' ? '👨‍🍳' : recipe.difficulty === 'Medio' ? '🔥' : '⭐'}
+            {recipe.difficulty === 'Fácil' ? '👨‍🍳' : recipe.difficulty === 'Intermedio' ? '🔥' : '⭐'}
           </Badge>
         </div>
       </Card>

@@ -621,30 +621,110 @@ export const llmFunctions: FunctionDefinition[] = [
   },
 
   // ==========================================================================
-  // MEAL PLANNING FUNCTIONS
+  // MEAL PLANNING SEARCH FUNCTIONS
   // ==========================================================================
   {
-    name: 'generateWeeklyMealPlan',
-    description: 'Genera un plan semanal de comidas basado en las preferencias del usuario y recetas disponibles. Responde SOLO con JSON estructurado, NO con texto natural.',
+    name: 'searchRecipesForPlanning',
+    description: 'Busca recetas con filtros específicos para planificación semanal. Devuelve SOLO IDs de recetas que cumplen los criterios.',
     parameters: {
       type: 'object',
       properties: {
-        userPrompt: {
-          type: 'string',
-          description: 'Instrucciones del usuario en lenguaje natural sobre cómo quiere su plan semanal',
-        },
-        availableRecipes: {
+        tags: {
           type: 'array',
-          description: 'Lista minimalista de recetas: {id, name, ingredients[], stepCount, calories, difficulty, time, tags}',
-          items: { type: 'object' },
-        },
-        userInventory: {
-          type: 'array',
-          description: 'IDs de ingredientes disponibles en el inventario del usuario',
+          description: 'Tags requeridos (ej: ["vegetariano", "bajo en calorías"])',
           items: { type: 'string' },
         },
+        excludeTags: {
+          type: 'array',
+          description: 'Tags a excluir (ej: ["lácteos", "gluten"])',
+          items: { type: 'string' },
+        },
+        maxCalories: {
+          type: 'number',
+          description: 'Calorías máximas por porción',
+        },
+        minCalories: {
+          type: 'number',
+          description: 'Calorías mínimas por porción',
+        },
+        maxTime: {
+          type: 'number',
+          description: 'Tiempo máximo de preparación en minutos',
+        },
+        difficulty: {
+          type: 'string',
+          description: 'Dificultad deseada',
+          enum: ['Fácil', 'Media', 'Difícil'],
+        },
+        mealType: {
+          type: 'string',
+          description: 'Tipo de comida',
+          enum: ['desayuno', 'comida', 'cena', 'snack'],
+        },
+        limit: {
+          type: 'number',
+          description: 'Número máximo de resultados (default: 20)',
+        },
       },
-      required: ['userPrompt', 'availableRecipes'],
+      required: [],
+    },
+  },
+  {
+    name: 'getRecipeNameById',
+    description: 'Obtiene el nombre de una receta por su ID. Útil para confirmar qué receta elegiste.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recipeId: {
+          type: 'string',
+          description: 'ID de la receta',
+        },
+      },
+      required: ['recipeId'],
+    },
+  },
+  {
+    name: 'getUserCookingHistory',
+    description: 'Obtiene el historial de cocina del usuario: recetas más preparadas y mejor valoradas.',
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Número de recetas a devolver (default: 10)',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'getRecipesByNutrition',
+    description: 'Busca recetas por criterios nutricionales específicos.',
+    parameters: {
+      type: 'object',
+      properties: {
+        maxCalories: {
+          type: 'number',
+          description: 'Calorías máximas por porción',
+        },
+        minProtein: {
+          type: 'number',
+          description: 'Proteína mínima en gramos',
+        },
+        maxCarbs: {
+          type: 'number',
+          description: 'Carbohidratos máximos en gramos',
+        },
+        maxFat: {
+          type: 'number',
+          description: 'Grasas máximas en gramos',
+        },
+        limit: {
+          type: 'number',
+          description: 'Número máximo de resultados',
+        },
+      },
+      required: [],
     },
   },
 ];

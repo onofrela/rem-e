@@ -23,8 +23,10 @@ export default function PlanPage() {
   }, []);
 
   const loadActivePlan = async () => {
+    console.log('🔄 Loading active plan...');
     setLoading(true);
     const plan = await getActiveMealPlan();
+    console.log('📋 Active plan loaded:', plan ? plan.id : 'None');
     setActivePlan(plan);
     setLoading(false);
   };
@@ -36,16 +38,25 @@ export default function PlanPage() {
   const handleGenerateLLM = async () => {
     if (!llmPrompt.trim()) return;
 
+    console.log('🤖 Starting LLM plan generation with prompt:', llmPrompt);
     setGenerating(true);
     try {
+      console.log('📝 Generating plan with LLM...');
       const plan = await generatePlanWithLLM(llmPrompt);
-      await createMealPlan(plan);
+      console.log('✅ Plan generated:', plan);
+
+      console.log('💾 Saving plan to database...');
+      const savedPlan = await createMealPlan(plan);
+      console.log('✅ Plan saved:', savedPlan);
+
+      console.log('🔄 Reloading active plan...');
       await loadActivePlan();
+
       setShowLlmInput(false);
       setLlmPrompt('');
     } catch (error) {
-      console.error('Error generating plan with LLM:', error);
-      alert('Error al generar el plan. Por favor intenta de nuevo.');
+      console.error('❌ Error generating plan with LLM:', error);
+      alert(`Error al generar el plan: ${error instanceof Error ? error.message : 'Unknown error'}\n\nAsegúrate de que LM Studio esté corriendo en http://localhost:1234 y que CORS esté habilitado.`);
     } finally {
       setGenerating(false);
     }

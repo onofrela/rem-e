@@ -12,14 +12,22 @@ export default function QuestionnairePage() {
   const [generating, setGenerating] = useState(false);
 
   const handleComplete = async (answers: QuestionnaireAnswers) => {
+    console.log('🚀 Starting plan generation with answers:', answers);
     setGenerating(true);
     try {
+      console.log('📝 Generating plan from questionnaire...');
       const plan = await generatePlanFromQuestionnaire(answers);
-      await createMealPlan(plan);
+      console.log('✅ Plan generated:', plan);
+
+      console.log('💾 Saving plan to database...');
+      const savedPlan = await createMealPlan(plan);
+      console.log('✅ Plan saved:', savedPlan);
+
+      console.log('🔄 Redirecting to /plan...');
       router.push('/plan');
     } catch (error) {
-      console.error('Error generating plan:', error);
-      alert('Error al generar el plan. Por favor intenta de nuevo.');
+      console.error('❌ Error generating plan:', error);
+      alert(`Error al generar el plan: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setGenerating(false);
     }
   };

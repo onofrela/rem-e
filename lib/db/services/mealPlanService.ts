@@ -12,6 +12,8 @@ import type { MealPlan, DailyMeals } from '../schemas/types';
 export async function createMealPlan(
   plan: Omit<MealPlan, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<MealPlan> {
+  console.log('💾 createMealPlan called with:', plan);
+
   const now = new Date().toISOString();
   const newPlan: MealPlan = {
     ...plan,
@@ -20,7 +22,17 @@ export async function createMealPlan(
     updatedAt: now,
   };
 
+  console.log('💾 Saving plan to database:', {
+    id: newPlan.id,
+    name: newPlan.name,
+    startDate: newPlan.startDate,
+    endDate: newPlan.endDate,
+  });
+
   await addItem(STORES.MEAL_PLANS, newPlan);
+
+  console.log('✅ Plan saved successfully');
+
   return newPlan;
 }
 
@@ -48,9 +60,24 @@ export async function getActiveMealPlan(): Promise<MealPlan | null> {
   const plans = await getAllItems<MealPlan>(STORES.MEAL_PLANS);
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
+  console.log('🔍 getActiveMealPlan - Today:', today);
+  console.log('🔍 Total plans in database:', plans.length);
+
+  if (plans.length > 0) {
+    console.log('📋 All plans:', plans.map(p => ({
+      id: p.id,
+      name: p.name,
+      startDate: p.startDate,
+      endDate: p.endDate,
+      isActive: p.startDate <= today && p.endDate >= today,
+    })));
+  }
+
   const activePlan = plans.find(plan =>
     plan.startDate <= today && plan.endDate >= today
   );
+
+  console.log('✅ Active plan found:', activePlan ? activePlan.id : 'None');
 
   return activePlan || null;
 }
@@ -123,23 +150,38 @@ export function generatePlanName(startDate: string, endDate: string): string {
 }
 
 /**
- * Calcula fechas de inicio y fin para la próxima semana
+ * Calcula fechas de inicio y fin para la semana actual (Lun-Dom)
  */
 export function getNextWeekDates(): { startDate: string; endDate: string } {
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ...
 
-  // Calculate next Monday
-  const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
-  const nextMonday = new Date(today);
-  nextMonday.setDate(today.getDate() + daysUntilMonday);
+  // Calculate this week's Monday (or next Monday if today is Sunday)
+  let daysToMonday;
+  if (dayOfWeek === 0) {
+    // Sunday - use next Monday
+    daysToMonday = 1;
+  } else {
+    // Any other day - go back to this Monday
+    daysToMonday = -(dayOfWeek - 1);
+  }
 
-  // Calculate next Sunday
-  const nextSunday = new Date(nextMonday);
-  nextSunday.setDate(nextMonday.getDate() + 6);
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + daysToMonday);
 
-  return {
-    startDate: nextMonday.toISOString().split('T')[0],
-    endDate: nextSunday.toISOString().split('T')[0],
-  };
+  // Calculate this week's Sunday
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const startDate = monday.toISOString().split('T')[0];
+  const endDate = sunday.toISOString().split('T')[0];
+
+  console.log('📅 Generated week dates:', {
+    today: today.toISOString().split('T')[0],
+    startDate,
+    endDate,
+    dayOfWeek,
+  });
+
+  return { startDate, endDate };
 }

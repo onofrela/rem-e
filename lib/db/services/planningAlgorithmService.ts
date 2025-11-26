@@ -8,7 +8,7 @@ import * as recipeService from './recipeService';
 import * as inventoryService from './inventoryService';
 import { generatePlanName, getNextWeekDates } from './mealPlanService';
 import { saveUserPreferences } from './userPreferencesService';
-import { callFunction } from '../llm/client';
+import { createLMStudioClient } from '../llm/client';
 
 const DAYS: Array<keyof WeeklyMeals> = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
 const MEAL_TYPES: Array<keyof DailyMeals> = ['desayuno', 'almuerzo', 'comida', 'cena'];
@@ -20,7 +20,10 @@ export async function generatePlanFromQuestionnaire(
   answers: QuestionnaireAnswers
 ): Promise<MealPlan> {
   // Save preferences for future use
-  await saveUserPreferences(answers);
+  await saveUserPreferences({
+    ...answers,
+    preferredCuisines: answers.preferredCuisines || []
+  });
 
   // Get all recipes
   const allRecipes = await recipeService.getAllRecipes();
@@ -72,6 +75,14 @@ export async function generatePlanFromQuestionnaire(
     },
   };
 
+  console.log('📅 Generated plan from questionnaire:', {
+    name: plan.name,
+    startDate: plan.startDate,
+    endDate: plan.endDate,
+    mealsCount: Object.keys(plan.meals).length,
+    meals: plan.meals,
+  });
+
   return plan as MealPlan;
 }
 
@@ -92,7 +103,7 @@ function filterRecipesByAnswers(recipes: Recipe[], answers: QuestionnaireAnswers
     }
 
     // Filter by skill level
-    if (answers.skillLevel === 'beginner' && recipe.difficulty === 'Difícil') {
+    if (answers.skillLevel === 'beginner' && recipe.difficulty === 'Avanzado') {
       return false;
     }
 
@@ -134,62 +145,55 @@ function selectRecipe(
 }
 
 /**
- * Genera un plan con LLM
+ * Genera un plan con LLM usando function calling
  */
 export async function generatePlanWithLLM(
   userPrompt: string,
   preferredLanguage: string = 'es'
 ): Promise<MealPlan> {
-  // Get recipes (minimalist payload)
-  const allRecipes = await recipeService.getAllRecipes();
-  const minimalRecipes = allRecipes.map(r => ({
-    id: r.id,
-    name: r.name,
-    ingredients: r.ingredients.map(ing => ing.ingredientId),
-    stepCount: r.steps.length,
-    calories: r.nutrition?.calories || 0,
-    difficulty: r.difficulty,
-    time: r.time,
-    tags: r.tags,
-  }));
+  // Create LLM client con system prompt optimizado para function calling
+  const client = createLMStudioClient({
+    systemPrompt: `Eres un asistente de planificación de comidas. Tu trabajo es generar un plan semanal usando las funciones disponibles.
 
-  // Get inventory
-  const inventory = await inventoryService.getInventory();
-  const inventoryIds = inventory.map(item => item.ingredientId);
-
-  // Call LLM
-  const response = await callLLM(
-    `El usuario quiere un plan semanal con estas indicaciones: "${userPrompt}".
-
-Genera un plan balanceado considerando:
-- Variedad: no repetir la misma receta más de 2 veces
-- Nutrición: balancear proteínas, vegetales, carbohidratos
-- Inventario: priorizar recetas con ingredientes disponibles
-
-Responde SOLO con JSON en este formato exacto:
+PROCESO:
+1. Usa searchRecipesForPlanning() con filtros según las necesidades del usuario (ej: tags=["vegetariano"], excludeTags=["lácteos"], maxCalories=500)
+2. Usa getUserCookingHistory() para ver qué recetas le gustan al usuario
+3. Selecciona recetas variadas para cada día
+4. Responde con JSON en este formato exacto:
 {
   "lunes": {"desayuno": "recipeId", "almuerzo": null, "comida": "recipeId", "cena": "recipeId"},
-  "martes": {...},
-  "miercoles": {...},
-  "jueves": {...},
-  "viernes": {...},
-  "sabado": {...},
-  "domingo": {...}
-}`,
-    [
-      {
-        name: 'generateWeeklyMealPlan',
-        arguments: JSON.stringify({
-          userPrompt,
-          availableRecipes: minimalRecipes,
-          userInventory: inventoryIds,
-        }),
-      },
-    ]
-  );
+  "martes": {"desayuno": "recipeId", "almuerzo": null, "comida": "recipeId", "cena": "recipeId"},
+  "miercoles": {"desayuno": "recipeId", "almuerzo": null, "comida": "recipeId", "cena": "recipeId"},
+  "jueves": {"desayuno": "recipeId", "almuerzo": null, "comida": "recipeId", "cena": "recipeId"},
+  "viernes": {"desayuno": "recipeId", "almuerzo": null, "comida": "recipeId", "cena": "recipeId"},
+  "sabado": {"desayuno": "recipeId", "almuerzo": null, "comida": "recipeId", "cena": "recipeId"},
+  "domingo": {"desayuno": "recipeId", "almuerzo": null, "comida": "recipeId", "cena": "recipeId"}
+}
+
+IMPORTANTE:
+- USA LAS FUNCIONES para buscar recetas, NO inventes IDs
+- Responde SOLO con el JSON final, sin explicaciones
+- Asegúrate de incluir TODOS los días de la semana`,
+  });
+
+  // Prompt simplificado - el LLM usará las funciones para obtener datos
+  const userMessage = `Genera un plan semanal con estas indicaciones: "${userPrompt}"
+
+Pasos:
+1. Usa searchRecipesForPlanning() para buscar recetas que cumplan los criterios
+2. Usa getUserCookingHistory() para ver preferencias del usuario
+3. Genera el plan JSON con los IDs de recetas seleccionadas`;
+
+  const result = await client.chat(userMessage);
+  const response = result.response;
+
+  console.log('🤖 LLM response:', response);
+  console.log('🔧 Function calls made:', result.functionCalls?.map(fc => fc.name));
 
   // Parse LLM response
   const meals = parseWeeklyMealsFromLLM(response);
+
+  console.log('📊 Parsed meals:', meals);
 
   // Create plan
   const { startDate, endDate } = getNextWeekDates();
@@ -200,6 +204,14 @@ Responde SOLO con JSON en este formato exacto:
     meals,
     generatedBy: 'llm',
   };
+
+  console.log('📅 Generated plan from LLM:', {
+    name: plan.name,
+    startDate: plan.startDate,
+    endDate: plan.endDate,
+    mealsCount: Object.keys(plan.meals).length,
+    meals: plan.meals,
+  });
 
   return plan as MealPlan;
 }

@@ -71,14 +71,14 @@ export interface VoiceContext {
   sessionId?: string | null;
 }
 
-const WS_URL = "ws://localhost:8765";
+const WS_URL = "ws://localhost:8765/ws";
 
 // Helper para crear errores con sugerencias
 function createVoiceError(type: ErrorType, message?: string): VoiceError {
   const errors: Record<ErrorType, { message: string; suggestion: string }> = {
     websocket: {
       message: message || "No se puede conectar al servidor de voz",
-      suggestion: "Ejecuta: cd voice-server && python voice_server.py"
+      suggestion: "Ejecuta: cd voice-server && python start_api.py"
     },
     voice_server: {
       message: message || "Error en el servidor de voz",

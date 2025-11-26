@@ -1,0 +1,39 @@
+# Configuracion de Ngrok para Rem-E
+#
+# 1. Crea una cuenta en https://dashboard.ngrok.com/signup
+# 2. Copia tu authtoken del dashboard
+# 3. Renombra este archivo a ngrok.yml
+# 4. Reemplaza TU_TOKEN_AQUI con tu token real
+# 5. Guarda este archivo en:
+#    Windows: %USERPROFILE%\.ngrok2\ngrok.yml
+#    Linux/Mac: ~/.ngrok2/ngrok.yml
+#
+# Luego ejecuta: ngrok start --all
+
+version: "2"
+authtoken: TU_TOKEN_AQUI
+
+tunnels:
+  # Tunel para Voice API (puerto 8765)
+  voice-api:
+    addr: 8765
+    proto: http
+    inspect: true
+    bind_tls: true
+    # Opcional: subdomain personalizado (requiere plan de pago)
+    # subdomain: rem-e-voice
+
+  # Tunel para LM Studio (puerto 1234)
+  # Descomenta si quieres exponer LM Studio tambien
+  # lm-studio:
+  #   addr: 1234
+  #   proto: http
+  #   inspect: true
+  #   bind_tls: true
+  #   subdomain: rem-e-lm
+
+# Configuracion regional (opcional)
+# region: us  # us, eu, ap, au, sa, jp, in
+
+# Web interface (dashboard local)
+web_addr: localhost:4040
