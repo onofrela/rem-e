@@ -98,6 +98,7 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
   const recognitionRef = useRef<any | null>(null);
   const isListeningRef = useRef(false);
   const wakeWordDetectedRef = useRef(false);
+  const isProcessingCommandRef = useRef(false); // Nuevo: prevenir auto-restart durante procesamiento
 
   // Actualizar contexto (ahora solo local, no enviamos a servidor)
   const updateContext = useCallback((context: VoiceContext) => {
@@ -222,6 +223,7 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
     setLastCommand(text);
     setStatus("thinking");
     setLlmResponse(null);
+    isProcessingCommandRef.current = true; // Marcar que estamos procesando
 
     try {
       // Paso 1: Clasificar con el LLM (solo si no es follow-up)
@@ -411,10 +413,25 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
       console.error("[Voice] Error llamando al asistente:", err);
       setError(createVoiceError("unknown", "No se pudo conectar con el asistente"));
     } finally {
-      setStatus("listening");
-      wakeWordDetectedRef.current = false;
+      // Esperar un poco antes de volver a listening para dar tiempo al usuario
+      setTimeout(() => {
+        setStatus("listening");
+        wakeWordDetectedRef.current = false;
+        isProcessingCommandRef.current = false;
+
+        // Si estamos en modo conversación, reiniciar recognition manualmente
+        if (conversationMode && recognitionRef.current && !isListeningRef.current) {
+          try {
+            recognitionRef.current.start();
+            isListeningRef.current = true;
+            console.log("[Voice] Restarted recognition for conversation mode");
+          } catch (err) {
+            console.error("[Voice] Error restarting recognition:", err);
+          }
+        }
+      }, conversationMode ? 1000 : 500); // Más tiempo en modo conversación
     }
-  }, [currentContext, conversationId, classifyWithLLM, router]);
+  }, [currentContext, conversationId, classifyWithLLM, router, conversationMode]);
 
   // Manejar resultado de reconocimiento de voz
   const handleRecognitionResult = useCallback(
@@ -584,10 +601,16 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
         console.log("[Voice] Recognition ended");
         isListeningRef.current = false;
 
-        // Auto-restart si no hay error
+        // NO auto-restart si estamos procesando un comando (el processCommand lo hará)
+        if (isProcessingCommandRef.current) {
+          console.log("[Voice] Skipping auto-restart (processing command)");
+          return;
+        }
+
+        // Auto-restart si no hay error y no estamos desconectados
         if (status !== "error" && status !== "disconnected") {
           setTimeout(() => {
-            if (recognitionRef.current) {
+            if (recognitionRef.current && !isProcessingCommandRef.current) {
               try {
                 recognitionRef.current.start();
                 isListeningRef.current = true;
