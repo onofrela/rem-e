@@ -52,20 +52,43 @@ export function isModelLoaded(): boolean {
 
 /**
  * Converts image element to base64 for API transmission
+ * Automatically resizes large images to reduce token consumption
  */
 export async function imageToBase64(imageElement: HTMLImageElement): Promise<string> {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
-    canvas.width = imageElement.naturalWidth;
-    canvas.height = imageElement.naturalHeight;
+
+    // Configuración de dimensiones máximas para optimizar tokens
+    const MAX_WIDTH = 1024;
+    const MAX_HEIGHT = 1024;
+
+    let width = imageElement.naturalWidth;
+    let height = imageElement.naturalHeight;
+
+    // Calcular nuevo tamaño manteniendo la relación de aspecto
+    if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+      const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+      width = Math.floor(width * ratio);
+      height = Math.floor(height * ratio);
+      console.log(`Imagen redimensionada de ${imageElement.naturalWidth}x${imageElement.naturalHeight} a ${width}x${height}`);
+    }
+
+    canvas.width = width;
+    canvas.height = height;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       throw new Error('No se pudo obtener contexto del canvas');
     }
 
-    ctx.drawImage(imageElement, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    // Usar interpolación de alta calidad para mejor resultado
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    ctx.drawImage(imageElement, 0, 0, width, height);
+
+    // Comprimir más agresivamente para reducir tamaño
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     resolve(dataUrl);
   });
 }
@@ -136,6 +159,10 @@ export async function recognizeFood(
   try {
     const base64Image = await imageToBase64(imageElement);
 
+    // Crear un AbortController para timeout personalizado
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutos
+
     const response = await fetch('/api/analyze-image', {
       method: 'POST',
       headers: {
@@ -144,7 +171,8 @@ export async function recognizeFood(
       body: JSON.stringify({
         image: base64Image,
       }),
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -200,6 +228,12 @@ export async function recognizeFood(
 
   } catch (error) {
     console.error('Error al analizar alimento:', error);
+
+    // Mejorar mensaje de error para timeouts
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('El análisis tardó demasiado tiempo. La imagen puede ser muy grande o LM Studio está ocupado.');
+    }
+
     throw error;
   }
 }

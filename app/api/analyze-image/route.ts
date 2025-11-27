@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 300; // 5 minutos para dar tiempo a imágenes grandes
 
 export interface AnalysisResult {
   type: 'platillo' | 'ingrediente' | 'producto_empaquetado' | 'desconocido';
