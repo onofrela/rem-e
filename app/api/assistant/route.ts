@@ -281,13 +281,24 @@ IMPORTANTE: Las funciones se ejecutan en el cliente (navegador), donde está Ind
           break;
 
         case 'RECIPE_SEARCH':
-          contextString += `INSTRUCCIONES ESPECÍFICAS:
-- Extrae el nombre del plato de la consulta
-- Usa searchRecipes con ese nombre
-- Si encuentras 1 resultado, usa navigateToRecipe inmediatamente
-- Si encuentras 2-3, menciona nombres y pregunta cuál
-- Si encuentras 4+, menciona los primeros 3 y pregunta
-- Si no encuentras ninguno, di que no existe`;
+          contextString += `INSTRUCCIONES ESPECÍFICAS PARA BÚSQUEDA DE RECETAS:
+
+1. **PRIMERO**: Usa searchRecipes con el nombre del plato extraído de la consulta del usuario
+
+2. **SEGUNDO - ANÁLISIS DE RESULTADOS**:
+   - Si searchRecipes devuelve 0 resultados: Di que no encontraste esa receta
+   - Si searchRecipes devuelve 1 resultado: El cliente AUTO-NAVEGARÁ (no hagas nada más)
+   - Si searchRecipes devuelve 2+ resultados:
+     a) ANALIZA cuál es la MEJOR COINCIDENCIA con la búsqueda original
+     b) Considera: nombre exacto > nombre similar > categoría relacionada
+     c) CRÍTICO: Llama a navigateToRecipe con el recipeId de la mejor coincidencia
+     d) Ejemplo: Si usuario buscó "Ensalada César" y hay 7 resultados, elige el que se llame EXACTAMENTE "Ensalada César"
+
+3. **NO PREGUNTES** al usuario cuál receta quiere - TÚ decides la mejor coincidencia
+
+4. **FORMATO DE RESPUESTA**: "Abriendo la receta de [NOMBRE_RECETA]"
+
+IMPORTANTE: Cuando llames a navigateToRecipe, el cliente navegará automáticamente.`;
           break;
       }
     }

@@ -3,6 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { parseNavigationCommand, NavigationRoute } from "@/lib/voice/navigationCommands";
+import {
+  useKitchenContext,
+  extractQuantity,
+  extractLocation,
+  isAssistantAskingQuestion
+} from "./useKitchenContext";
 
 export type VoiceStatus = "disconnected" | "listening" | "thinking" | "processing" | "error";
 
@@ -99,6 +105,20 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
   const isListeningRef = useRef(false);
   const wakeWordDetectedRef = useRef(false);
   const isProcessingCommandRef = useRef(false); // Nuevo: prevenir auto-restart durante procesamiento
+
+  // ============================================================================
+  // KITCHEN CONTEXT - Recuperado del servidor Python Vosk
+  // ============================================================================
+  const {
+    context: kitchenContext,
+    updateActivity,
+    checkTimeout,
+    setPendingIngredient,
+    setPendingLocation,
+    clearPending,
+    hasAllDataForInventory,
+    getInventoryData,
+  } = useKitchenContext();
 
   // Actualizar contexto (ahora solo local, no enviamos a servidor)
   const updateContext = useCallback((context: VoiceContext) => {
@@ -225,7 +245,29 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
     setLlmResponse(null);
     isProcessingCommandRef.current = true; // Marcar que estamos procesando
 
+    // Variable para controlar si debemos activar modo conversación al final
+    let shouldActivateConversation = false;
+
     try {
+      // =========================================================================
+      // EXTRACCIÓN DE DATOS - Recuperado del servidor Python
+      // =========================================================================
+      const detectedQuantity = extractQuantity(text);
+      const detectedLocation = extractLocation(text);
+
+      // Guardar cantidad si es diferente del default
+      if (detectedQuantity > 1 && kitchenContext.pending_quantity !== detectedQuantity) {
+        console.log(`[Kitchen] Cantidad detectada: ${detectedQuantity}`);
+        // Actualizar directamente el pending_quantity
+        kitchenContext.pending_quantity = detectedQuantity;
+      }
+
+      // Guardar ubicación si se detectó
+      if (detectedLocation) {
+        console.log(`[Kitchen] Ubicación detectada: ${detectedLocation}`);
+        setPendingLocation(detectedLocation);
+      }
+
       // Paso 1: Clasificar con el LLM (solo si no es follow-up)
       let classification = 'GENERAL_QUESTION';
       if (!isFollowUp) {
@@ -283,31 +325,22 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
             timestamp: Date.now(),
           });
 
-          // Detectar si el LLM está haciendo una pregunta para activar modo conversación
-          const responseText = data.response.toLowerCase();
-          const isLLMQuestion =
-            data.response.trim().endsWith('?') ||
-            responseText.includes('¿') ||
-            responseText.includes('dónde') ||
-            responseText.includes('cuál') ||
-            responseText.includes('cuáles') ||
-            responseText.includes('cuánto') ||
-            responseText.includes('cuántos') ||
-            responseText.includes('cuánta') ||
-            responseText.includes('cuántas') ||
-            (responseText.includes('donde ') && !responseText.includes('donde.')) ||
-            (responseText.includes('cual ') && !responseText.includes('cual.')) ||
-            responseText.includes('guardas') ||
-            (responseText.includes('refrigerador') && responseText.includes('congelador') && responseText.includes('alacena'));
+          // ===================================================================
+          // DETECCIÓN DE PREGUNTA - Recuperado del servidor Python
+          // ===================================================================
+          const isLLMQuestion = isAssistantAskingQuestion(data.response);
 
           if (isLLMQuestion) {
             setConversationMode(true);
             lastLLMWasQuestionRef.current = true;
+            shouldActivateConversation = true; // Marcar para activar en finally
             console.log("[Voice] Modo conversación ACTIVADO - LLM hizo una pregunta:", data.response);
           } else {
             if (!isFollowUp) {
               setConversationMode(false);
               lastLLMWasQuestionRef.current = false;
+              shouldActivateConversation = false;
+              clearPending(); // Limpiar pending si la conversación terminó
               console.log("[Voice] Modo conversación DESACTIVADO - respuesta completada");
             }
           }
@@ -329,19 +362,112 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
             console.log(`[Voice] Ejecutando: ${toolCall.name}`, toolCall.args);
             const result = await executeClientFunction(toolCall.name, toolCall.args);
 
+            // =================================================================
+            // MANEJO DE searchIngredients - Recuperado del servidor Python
+            // =================================================================
+            if (toolCall.name === 'searchIngredients' && result.success && result.data) {
+              const ingredients = result.data;
+              if (Array.isArray(ingredients) && ingredients.length > 0) {
+                const firstIng = ingredients[0];
+                console.log(`[Kitchen] ✅ Ingrediente encontrado: ${firstIng.name} (ID: ${firstIng.id})`);
+
+                // Guardar ingrediente pendiente con la cantidad ya extraída
+                setPendingIngredient(
+                  { id: firstIng.id, name: firstIng.name },
+                  kitchenContext.pending_quantity,
+                  kitchenContext.pending_unit
+                );
+
+                // Verificar si ya tenemos todos los datos
+                if (hasAllDataForInventory()) {
+                  console.log("[Kitchen] ✅ Todos los datos disponibles - Auto-agregando al inventario...");
+
+                  const inventoryData = getInventoryData();
+                  if (inventoryData) {
+                    const addResult = await executeClientFunction('addToInventory', inventoryData);
+
+                    if (addResult.success) {
+                      console.log("[Kitchen] ✅ Ingrediente agregado exitosamente");
+                      clearPending();
+
+                      // Agregar resultado de addToInventory también
+                      toolResults.push({
+                        tool_call_id: `auto_add_${toolCall.id}`,
+                        result: addResult,
+                      });
+                    } else {
+                      console.error("[Kitchen] ❌ Error al agregar:", addResult.error);
+                    }
+                  }
+                } else {
+                  console.log("[Kitchen] ⏳ Falta ubicación - el LLM preguntará");
+                }
+              }
+            }
+
+            // =================================================================
+            // MANEJO DE searchRecipes - Auto-navegar a mejor coincidencia
+            // =================================================================
+            if (toolCall.name === 'searchRecipes' && result.success && result.data) {
+              const searchData = result.data as {
+                found?: boolean;
+                count?: number;
+                recipes?: Array<{ id: string; name: string; [key: string]: any }>;
+                message?: string;
+              };
+
+              // El resultado de searchRecipes tiene formato: { found, count, recipes, message }
+              if (searchData.found && searchData.recipes && searchData.recipes.length > 0) {
+                console.log(`[Recipe] 🔍 Encontradas ${searchData.count} recetas`);
+
+                // El LLM debe analizar los resultados y decidir cuál es la mejor coincidencia
+                // Pero si solo hay 1 resultado, navegamos directamente
+                if (searchData.recipes.length === 1) {
+                  const recipe = searchData.recipes[0];
+                  console.log(`[Recipe] ✅ Solo 1 resultado - Auto-navegando a: ${recipe.name}`);
+
+                  const navResult = await executeClientFunction('navigateToRecipe', {
+                    recipeId: recipe.id,
+                    recipeName: recipe.name
+                  });
+
+                  if (navResult.success && navResult.data) {
+                    const navData = navResult.data as { url?: string };
+                    if (navData.url) {
+                      console.log("[Recipe] 🚀 Navegando a:", navData.url);
+                      router.push(navData.url);
+                    }
+                  }
+
+                  // Agregar resultado de navegación
+                  toolResults.push({
+                    tool_call_id: `auto_nav_${toolCall.id}`,
+                    result: navResult,
+                  });
+                }
+                // Si hay múltiples resultados, el LLM decidirá en la siguiente iteración
+                else {
+                  console.log(`[Recipe] 📋 Múltiples resultados (${searchData.count}) - El LLM elegirá la mejor coincidencia`);
+                }
+              }
+            }
+
+            // =================================================================
+            // MANEJO DE navigateToRecipe - Navegación automática
+            // =================================================================
+            if (toolCall.name === 'navigateToRecipe' && result.success && result.data) {
+              const navData = result.data as { url?: string; recipeName?: string; recipeId?: string };
+              if (navData.url) {
+                console.log("[Recipe] 🚀 Navegando a receta:", navData.recipeName || navData.recipeId);
+                console.log("[Recipe] URL:", navData.url);
+                router.push(navData.url);
+              }
+            }
+
             toolResults.push({
               tool_call_id: toolCall.id,
               result,
             });
-
-            // Si es navigateToRecipe, navegar inmediatamente
-            if (toolCall.name === 'navigateToRecipe' && result.success && result.data) {
-              const navData = result.data as { url?: string; recipeName?: string; recipeId?: string };
-              if (navData.url) {
-                console.log("[Voice] Navegando a:", navData.url);
-                router.push(navData.url);
-              }
-            }
           }
 
           // Enviar resultados de vuelta al servidor
@@ -373,20 +499,20 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
               timestamp: Date.now(),
             });
 
-            const responseText = dataWithResults.response.toLowerCase();
-            const isLLMQuestion =
-              dataWithResults.response.trim().endsWith('?') ||
-              responseText.includes('¿') ||
-              responseText.includes('dónde') ||
-              responseText.includes('cuál');
+            const isLLMQuestion = isAssistantAskingQuestion(dataWithResults.response);
 
             if (isLLMQuestion) {
               setConversationMode(true);
               lastLLMWasQuestionRef.current = true;
+              shouldActivateConversation = true; // Marcar para activar en finally
+              console.log("[Voice] Modo conversación ACTIVADO - LLM hizo una pregunta");
             } else {
               if (!isFollowUp) {
                 setConversationMode(false);
                 lastLLMWasQuestionRef.current = false;
+                shouldActivateConversation = false;
+                clearPending();
+                console.log("[Voice] Modo conversación DESACTIVADO");
               }
             }
 
@@ -419,19 +545,36 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
         wakeWordDetectedRef.current = false;
         isProcessingCommandRef.current = false;
 
-        // Si estamos en modo conversación, reiniciar recognition manualmente
-        if (conversationMode && recognitionRef.current && !isListeningRef.current) {
+        // Si debemos activar modo conversación, reiniciar recognition manualmente
+        if (shouldActivateConversation && recognitionRef.current && !isListeningRef.current) {
           try {
             recognitionRef.current.start();
             isListeningRef.current = true;
-            console.log("[Voice] Restarted recognition for conversation mode");
+            console.log("[Voice] ✅ Restarted recognition for conversation mode");
+
+            // ⏱️ IMPORTANTE: Iniciar timeout AQUÍ, después de reiniciar recognition
+            updateActivity();
+            console.log("[Timeout] ⏱️ Cuenta de 30s iniciada - el usuario puede responder ahora");
           } catch (err) {
             console.error("[Voice] Error restarting recognition:", err);
           }
         }
-      }, conversationMode ? 1000 : 500); // Más tiempo en modo conversación
+      }, shouldActivateConversation ? 1000 : 500); // Más tiempo si es conversación
     }
-  }, [currentContext, conversationId, classifyWithLLM, router, conversationMode]);
+  }, [
+    currentContext,
+    conversationId,
+    classifyWithLLM,
+    router,
+    conversationMode,
+    kitchenContext,
+    setPendingIngredient,
+    setPendingLocation,
+    clearPending,
+    hasAllDataForInventory,
+    getInventoryData,
+    updateActivity
+  ]);
 
   // Manejar resultado de reconocimiento de voz
   const handleRecognitionResult = useCallback(
@@ -654,6 +797,28 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
     setTranscript("");
     console.log("[Voice] Disconnected");
   }, []);
+
+  // ============================================================================
+  // TIMEOUT AUTOMÁTICO DE CONVERSACIÓN - Recuperado del servidor Python
+  // ============================================================================
+  useEffect(() => {
+    if (!conversationMode) return;
+
+    console.log("[Timeout] Iniciando verificación de timeout de conversación");
+
+    const interval = setInterval(() => {
+      if (checkTimeout()) {
+        console.log("[Timeout] Conversación expirada - desactivando modo conversación");
+        setConversationMode(false);
+        lastLLMWasQuestionRef.current = false;
+        clearPending();
+      }
+    }, 5000); // Verificar cada 5 segundos
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [conversationMode, checkTimeout, clearPending]);
 
   // Auto-conectar al montar SOLO en desktop
   // En móvil REQUIERE interacción del usuario

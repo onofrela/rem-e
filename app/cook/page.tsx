@@ -1,14 +1,17 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { MainLayout } from '@/components/layout';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
-import { api } from '@/lib/api/mock-api';
 import { recognizeFoodFromFile, RecognitionResult } from '@/lib/vision';
+import { searchIngredients } from '@/lib/db/services/ingredientService';
+import { getTopRecommendedRecipes } from '@/lib/db/services/cookRecommendationService';
+import type { Recipe } from '@/lib/db/schemas/types';
 
 type InputMethod = 'photo' | 'manual' | 'suggestions';
 
@@ -33,6 +36,29 @@ export default function CookPage() {
 
   const [detectionError, setDetectionError] = useState<string | null>(null);
   const [lastRecognitionResult, setLastRecognitionResult] = useState<RecognitionResult | null>(null);
+
+  // Estado para sugerencias de recetas
+  const [recommendedRecipes, setRecommendedRecipes] = useState<Recipe[]>([]);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+
+  // Cargar recomendaciones cuando se selecciona el método de sugerencias
+  useEffect(() => {
+    if (activeMethod === 'suggestions') {
+      loadRecommendations();
+    }
+  }, [activeMethod]);
+
+  const loadRecommendations = async () => {
+    setIsLoadingRecommendations(true);
+    try {
+      const recommendations = await getTopRecommendedRecipes(10);
+      setRecommendedRecipes(recommendations.map(r => r.recipe));
+    } catch (error) {
+      console.error('Error loading recommendations:', error);
+    } finally {
+      setIsLoadingRecommendations(false);
+    }
+  };
 
   // Handle photo capture with real AI detection
   const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,8 +142,13 @@ export default function CookPage() {
       return;
     }
 
-    const results = await api.searchIngredients(query);
-    setSearchResults(results);
+    try {
+      const results = await searchIngredients({ query, limit: 10 });
+      setSearchResults(results.map(ing => ing.name));
+    } catch (error) {
+      console.error('Error searching ingredients:', error);
+      setSearchResults([]);
+    }
   };
 
   // Add ingredient
@@ -412,66 +443,74 @@ export default function CookPage() {
           {activeMethod === 'suggestions' && (
             <Card variant="elevated" padding="lg" className="mb-6 animate-fadeInUp">
               <h3 className="text-lg sm:text-xl font-semibold mb-4 text-[var(--color-text-primary)]">
-                Ingredientes sugeridos
+                Recetas recomendadas para ti
               </h3>
               <p className="text-sm sm:text-base text-[var(--color-text-secondary)] mb-6">
-                Basado en lo que sueles tener disponible
+                Basado en tu inventario, historial y preferencias
               </p>
 
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-[var(--color-accent)] rounded-lg">
-                  <div>
-                    <p className="font-semibold text-[var(--color-text-primary)]">
-                      🥚 Ingredientes de desayuno
-                    </p>
-                    <p className="text-sm text-[var(--color-text-secondary)]">
-                      Huevo, Pan, Leche, Queso
-                    </p>
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => setSelectedIngredients(['Huevo', 'Pan', 'Leche', 'Queso'])}
-                  >
-                    Usar
-                  </Button>
+              {isLoadingRecommendations ? (
+                <div className="text-center py-12">
+                  <div className="inline-block animate-spin text-4xl mb-3">🔍</div>
+                  <p className="text-[var(--color-text-secondary)]">
+                    Buscando las mejores recetas para ti...
+                  </p>
                 </div>
+              ) : recommendedRecipes.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">🤔</div>
+                  <p className="text-[var(--color-text-secondary)]">
+                    No hay recetas disponibles. Agrega recetas a tu base de datos primero.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                  {recommendedRecipes.map((recipe, index) => (
+                    <Link key={recipe.id} href={`/recipes/${recipe.id}`}>
+                      <Card
+                        variant="outlined"
+                        padding="md"
+                        hoverable
+                        className="transition-all hover:shadow-md"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="text-4xl flex-shrink-0">🍽</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <h4 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
+                                {recipe.name}
+                              </h4>
+                              <Badge variant="info" size="sm">
+                                #{index + 1}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-[var(--color-text-secondary)] mb-3 line-clamp-2">
+                              {recipe.description}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <Badge variant="default" size="sm">
+                                ⏱ {recipe.time}m
+                              </Badge>
+                              <Badge variant="success" size="sm">
+                                👨‍🍳 {recipe.difficulty}
+                              </Badge>
+                              <Badge variant="default" size="sm">
+                                🍴 {recipe.servings}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              )}
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-[var(--color-accent)] rounded-lg">
-                  <div>
-                    <p className="font-semibold text-[var(--color-text-primary)]">
-                      🍝 Ingredientes para pasta
-                    </p>
-                    <p className="text-sm text-[var(--color-text-secondary)]">
-                      Pasta, Tomate, Ajo, Queso
-                    </p>
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => setSelectedIngredients(['Pasta', 'Tomate', 'Ajo', 'Queso'])}
-                  >
-                    Usar
-                  </Button>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-[var(--color-accent)] rounded-lg">
-                  <div>
-                    <p className="font-semibold text-[var(--color-text-primary)]">
-                      🌮 Comida mexicana
-                    </p>
-                    <p className="text-sm text-[var(--color-text-secondary)]">
-                      Pollo, Tortillas, Tomate, Cebolla, Limón
-                    </p>
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => setSelectedIngredients(['Pollo', 'Tortillas', 'Tomate', 'Cebolla', 'Limón'])}
-                  >
-                    Usar
-                  </Button>
-                </div>
+              <div className="mt-4 p-3 bg-[var(--color-accent)] rounded-lg">
+                <p className="text-xs sm:text-sm text-[var(--color-text-secondary)]">
+                  💡 <strong>Consejo:</strong> Estas recetas se seleccionan según lo que tienes en inventario
+                  y tus preferencias de cocina. Toca cualquier receta para ver los detalles completos.
+                </p>
               </div>
             </Card>
           )}
@@ -507,21 +546,25 @@ export default function CookPage() {
             </Card>
           )}
 
-          {/* Continue Button */}
-          <Button
-            variant="primary"
-            size="xl"
-            fullWidth
-            onClick={handleContinue}
-            disabled={selectedIngredients.length === 0}
-          >
-            Ver Recetas Sugeridas ({selectedIngredients.length} ingredientes)
-          </Button>
+          {/* Continue Button - solo para foto y manual */}
+          {activeMethod !== 'suggestions' && (
+            <>
+              <Button
+                variant="primary"
+                size="xl"
+                fullWidth
+                onClick={handleContinue}
+                disabled={selectedIngredients.length === 0}
+              >
+                Ver Recetas Sugeridas ({selectedIngredients.length} ingredientes)
+              </Button>
 
-          {selectedIngredients.length === 0 && (
-            <p className="text-center text-sm text-[var(--color-text-secondary)] mt-4">
-              Agrega al menos un ingrediente para continuar
-            </p>
+              {selectedIngredients.length === 0 && (
+                <p className="text-center text-sm text-[var(--color-text-secondary)] mt-4">
+                  Agrega al menos un ingrediente para continuar
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>

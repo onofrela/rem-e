@@ -157,3 +157,9 @@ export {
   generatePlanFromQuestionnaire,
   generatePlanWithLLM,
 } from './planningAlgorithmService';
+
+// Cook Recommendation Service
+export {
+  getTopRecommendedRecipes,
+  getRecipesByIngredients,
+} from './cookRecommendationService';

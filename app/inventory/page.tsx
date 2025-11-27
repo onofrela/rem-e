@@ -234,7 +234,7 @@ export default function InventoryPage() {
           )}
 
           {/* Stats Grid - Tablet oriented */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-6">
             <Card variant="elevated" padding="lg" className="text-center">
               <span className="text-4xl md:text-5xl mb-2 block">📦</span>
               <p className="text-2xl md:text-3xl font-bold text-[var(--color-primary)]">
@@ -251,15 +251,6 @@ export default function InventoryPage() {
               </p>
               <p className="text-xs md:text-sm text-[var(--color-text-secondary)] mt-1">
                 Por caducar
-              </p>
-            </Card>
-            <Card variant="elevated" padding="lg" className="text-center">
-              <span className="text-4xl md:text-5xl mb-2 block">📉</span>
-              <p className="text-2xl md:text-3xl font-bold text-yellow-500">
-                {alerts.filter((a) => a.type === 'low_stock').length}
-              </p>
-              <p className="text-xs md:text-sm text-[var(--color-text-secondary)] mt-1">
-                Bajo stock
               </p>
             </Card>
             <Card variant="elevated" padding="lg" className="text-center">

@@ -15,8 +15,6 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [servings, setServings] = useState(4);
   const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
-  const [showSubstitutions, setShowSubstitutions] = useState<string | null>(null);
-  const [substitutions, setSubstitutions] = useState<any[]>([]);
 
   useEffect(() => {
     loadRecipe();
@@ -46,12 +44,6 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
       newChecked.add(index);
     }
     setCheckedIngredients(newChecked);
-  };
-
-  const handleShowSubstitutions = async (ingredient: string) => {
-    setShowSubstitutions(ingredient);
-    // TODO: Implement real substitution service
-    setSubstitutions([]);
   };
 
   const startCooking = () => {
@@ -198,16 +190,6 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
                         )}
                       </span>
                     </div>
-
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleShowSubstitutions(ing.displayName);
-                      }}
-                      className="text-sm text-[var(--color-primary)] hover:underline"
-                    >
-                      Sustituir
-                    </button>
                   </div>
                 </div>
               ))}
@@ -342,58 +324,6 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       </div>
-
-      {/* Substitutions Modal */}
-      {showSubstitutions && (
-        <div
-          className="fixed inset-0 bg-black/50 z-[var(--z-modal-backdrop)] flex items-end md:items-center justify-center p-4"
-          onClick={() => setShowSubstitutions(null)}
-        >
-          <Card
-            variant="elevated"
-            padding="lg"
-            className="w-full max-w-lg max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-[var(--color-text-primary)]">
-                Sustitutos para {showSubstitutions}
-              </h3>
-              <button
-                onClick={() => setShowSubstitutions(null)}
-                className="text-2xl text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {substitutions.map((sub, idx) => (
-                <div key={idx} className="p-4 bg-[var(--color-surface)] rounded-lg">
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-semibold text-[var(--color-text-primary)]">
-                      {sub.name}
-                    </h4>
-                    <Badge
-                      variant={
-                        sub.availability === 'common' ? 'success' :
-                        sub.availability === 'moderate' ? 'warning' : 'error'
-                      }
-                      size="sm"
-                    >
-                      {sub.availability === 'common' ? 'Común' :
-                       sub.availability === 'moderate' ? 'Moderado' : 'Raro'}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-[var(--color-text-secondary)]">
-                    {sub.impact}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
     </MainLayout>
   );
 }

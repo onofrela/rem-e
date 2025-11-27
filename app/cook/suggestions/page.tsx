@@ -7,8 +7,15 @@ import { MainLayout } from '@/components/layout';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { api, RecipeSuggestion } from '@/lib/api/mock-api';
-import { Recipe } from '@/lib/utils/mock-data';
+import { getRecipesByIngredients } from '@/lib/db/services/cookRecommendationService';
+import type { Recipe } from '@/lib/db/schemas/types';
+
+interface RecipeSuggestion {
+  recipe: Recipe;
+  score: number;
+  matchPercentage: number;
+  missingIngredients: string[];
+}
 
 export default function SuggestionsPage() {
   const router = useRouter();
@@ -35,13 +42,23 @@ export default function SuggestionsPage() {
   const loadSuggestions = async (ings: string[]) => {
     setIsLoading(true);
     try {
-      const results = await api.getRecipeSuggestions(ings, {
+      const results = await getRecipesByIngredients(ings, {
         maxTime: filters.maxTime || undefined,
         difficulty: filters.difficulty || undefined,
       });
-      setSuggestions(results);
+
+      // Transformar resultados al formato esperado
+      const suggestions: RecipeSuggestion[] = results.map(result => ({
+        recipe: result.recipe,
+        score: result.score,
+        matchPercentage: result.matchPercentage,
+        missingIngredients: result.missingIngredients,
+      }));
+
+      setSuggestions(suggestions);
     } catch (error) {
       console.error('Error loading suggestions:', error);
+      setSuggestions([]);
     } finally {
       setIsLoading(false);
     }
@@ -170,7 +187,7 @@ export default function SuggestionsPage() {
               </Card>
             ) : (
               suggestions.map((recipe) => (
-                <Link key={recipe.id} href={`/recipes/${recipe.id}`}>
+                <Link key={recipe.recipe.id} href={`/recipes/${recipe.recipe.id}`}>
                   <Card variant="elevated" padding="none" hoverable>
                     <div className="flex flex-col md:flex-row">
                       {/* Recipe Image */}
@@ -182,38 +199,33 @@ export default function SuggestionsPage() {
                       <div className="flex-1 p-6">
                         <div className="flex items-start justify-between mb-2">
                           <h3 className="text-xl font-bold text-[var(--color-text-primary)]">
-                            {recipe.name}
+                            {recipe.recipe.name}
                           </h3>
-                          {recipe.matchScore === 1 ? (
+                          {recipe.matchPercentage === 1 ? (
                             <Badge variant="success" size="sm">
                               ✓ Completo
                             </Badge>
                           ) : (
                             <Badge variant="warning" size="sm">
-                              {Math.round(recipe.matchScore * 100)}% match
+                              {Math.round(recipe.matchPercentage * 100)}% match
                             </Badge>
                           )}
                         </div>
 
                         <p className="text-[var(--color-text-secondary)] mb-4">
-                          {recipe.description}
+                          {recipe.recipe.description}
                         </p>
 
                         <div className="flex flex-wrap gap-2 mb-4">
                           <Badge variant="default" size="sm">
-                            ⏱ {recipe.time} min
+                            ⏱ {recipe.recipe.time} min
                           </Badge>
                           <Badge variant="default" size="sm">
-                            👨‍🍳 {recipe.difficulty}
+                            👨‍🍳 {recipe.recipe.difficulty}
                           </Badge>
                           <Badge variant="default" size="sm">
-                            🍴 {recipe.servings} porciones
+                            🍴 {recipe.recipe.servings} porciones
                           </Badge>
-                          {recipe.calories && (
-                            <Badge variant="default" size="sm">
-                              🔥 {recipe.calories} kcal
-                            </Badge>
-                          )}
                         </div>
 
                         {recipe.missingIngredients.length > 0 && (
@@ -222,13 +234,13 @@ export default function SuggestionsPage() {
                               Te faltan:
                             </p>
                             <div className="flex flex-wrap gap-1">
-                              {recipe.missingIngredients.slice(0, 5).map((ing) => (
-                                <Badge key={ing} variant="error" size="sm">
+                              {recipe.missingIngredients.slice(0, 5).map((ing, idx) => (
+                                <Badge key={`${recipe.recipe.id}-missing-${idx}`} variant="error" size="sm">
                                   {ing}
                                 </Badge>
                               ))}
                               {recipe.missingIngredients.length > 5 && (
-                                <Badge variant="error" size="sm">
+                                <Badge key={`${recipe.recipe.id}-missing-more`} variant="error" size="sm">
                                   +{recipe.missingIngredients.length - 5} más
                                 </Badge>
                               )}

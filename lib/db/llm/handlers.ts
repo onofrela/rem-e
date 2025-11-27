@@ -1926,14 +1926,49 @@ async function handleSearchRecipesForPlanning(args: Record<string, unknown>): Pr
 
     // Filter by meal type (based on tags/category)
     if (mealType) {
-      filtered = filtered.filter(r =>
-        r.tags.some(t => t.toLowerCase().includes(mealType.toLowerCase())) ||
-        r.category.toLowerCase().includes(mealType.toLowerCase())
-      );
+      const mealTypeLower = mealType.toLowerCase();
+      filtered = filtered.filter(r => {
+        const recipeTags = r.tags.map(t => t.toLowerCase());
+        const recipeCategory = r.category.toLowerCase();
+
+        // Mapeo de tipos de comida a palabras clave
+        const keywords: Record<string, string[]> = {
+          desayuno: ['desayuno', 'breakfast', 'morning', 'desayunos'],
+          comida: ['comida', 'almuerzo', 'lunch', 'main', 'principal', 'plato fuerte'],
+          cena: ['cena', 'dinner', 'evening', 'nocturno'],
+          snack: ['snack', 'botana', 'aperitivo', 'antojito'],
+        };
+
+        const relevantKeywords = keywords[mealTypeLower] || [mealTypeLower];
+
+        return relevantKeywords.some(keyword =>
+          recipeTags.some(tag => tag.includes(keyword)) ||
+          recipeCategory.includes(keyword)
+        );
+      });
+
+      console.log(`🔍 Filtered ${filtered.length} recipes for meal type: ${mealType}`);
     }
 
+    // Shuffle for variety (if multiple calls are made)
+    const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+
     // Limit results
-    const results = filtered.slice(0, limit);
+    const results = shuffled.slice(0, limit);
+
+    console.log(`✅ searchRecipesForPlanning returning ${results.length} recipes`);
+
+    if (results.length === 0) {
+      return {
+        success: true,
+        data: {
+          recipeIds: [],
+          count: 0,
+          recipes: [],
+          message: `No se encontraron recetas que cumplan los criterios. Intenta con filtros menos restrictivos.`,
+        },
+      };
+    }
 
     return {
       success: true,
@@ -1943,7 +1978,10 @@ async function handleSearchRecipesForPlanning(args: Record<string, unknown>): Pr
         recipes: results.map(r => ({
           id: r.id,
           name: r.name,
+          time: r.time,
+          difficulty: r.difficulty,
         })),
+        message: `Encontradas ${results.length} recetas para ${mealType || 'planificación'}`,
       },
     };
   } catch (error) {
