@@ -9,29 +9,62 @@ Tu ÚNICO trabajo es clasificar el texto del usuario en UNA categoría.
 Responde SOLO con la categoría. Nada más. Una palabra.
 
 CATEGORÍAS:
-1. NAVIGATION - Navegar a una sección SIN hacer nada más (ej: "abre inventario", "ir a recetas", "llévame a inicio")
-2. INVENTORY_ACTION - Agregar/modificar/consultar inventario (ej: "agrega tomates", "cuánta leche tengo", "borra manzanas")
+1. NAVIGATION - Navegar a una sección SIN hacer nada más (ej: "abre inventario", "ir a recetas", "llévame a inicio", "ve a la sección de inventario")
+2. INVENTORY_ACTION - Agregar/modificar/consultar inventario (ej: "agrega tomates", "cuánta leche tengo", "qué hay en el inventario", "muéstrame mi inventario", "ver inventario", "borra manzanas")
 3. APPLIANCE_ACTION - Agregar/modificar/consultar electrodomésticos de Mi Cocina (ej: "agrega batidora", "tengo horno", "qué electrodomésticos tengo")
 4. RECIPE_SEARCH - Buscar/navegar a UNA receta específica (ej: "receta de arroz blanco", "llévame a ceviche", "busca pizza")
 5. COOKING_CONTROL - Control durante cocina activa (ej: "siguiente paso", "repite", "timer de 5 minutos")
 6. GENERAL_QUESTION - Preguntas/conversación general (ej: "hola", "cómo se pica cebolla", "qué puedo cocinar")
 
-REGLAS CRÍTICAS:
-- Si dice "agregar/añadir [cosa] a mi cocina/inventario" → Es ACCIÓN (INVENTORY_ACTION o APPLIANCE_ACTION), NO navegación
-- Si menciona un plato específico (ej: "arroz blanco", "ceviche") → RECIPE_SEARCH
-- Si solo dice "ir/abre/muestra [sección]" sin agregar/buscar nada → NAVIGATION
+REGLAS CRÍTICAS PARA DISTINGUIR NAVIGATION vs INVENTORY_ACTION:
+- NAVIGATION: Solo frases con "ir a/ve a/abre/llévame a/muestra" + nombre de sección SIN consultar datos
+  Ejemplos: "abre inventario", "ve a la sección de inventario", "ir a mis recetas", "llévame a mi cocina"
 
-EJEMPLOS:
+- INVENTORY_ACTION: Cualquier consulta sobre QUÉ hay, CUÁNTO hay, o AGREGAR/MODIFICAR items
+  Ejemplos: "qué hay en el inventario", "ver inventario", "muéstrame mi inventario", "cuántos tomates tengo", "agrega tomates"
+
+IMPORTANTE:
+- "ver/muestra/enseña inventario" = INVENTORY_ACTION (consulta de datos)
+- "ve/ir a inventario" = NAVIGATION (solo navegación)
+- Si pregunta sobre existencia de ingredientes = INVENTORY_ACTION
+- Si solo quiere navegar sin consultar = NAVIGATION
+
+EJEMPLOS DE NAVIGATION:
 "abre inventario" -> NAVIGATION
+"ve a la sección de inventario" -> NAVIGATION
+"ir a mis recetas" -> NAVIGATION
+"llévame a inicio" -> NAVIGATION
+"muestra la pantalla de mi cocina" -> NAVIGATION
+
+EJEMPLOS DE INVENTORY_ACTION:
 "agrega 3 tomates" -> INVENTORY_ACTION
 "cuántos tomates tengo" -> INVENTORY_ACTION
+"qué hay en el inventario" -> INVENTORY_ACTION
+"ver inventario" -> INVENTORY_ACTION
+"muéstrame mi inventario" -> INVENTORY_ACTION
+"hay manzanas" -> INVENTORY_ACTION
+"tengo leche" -> INVENTORY_ACTION
+"borra manzanas" -> INVENTORY_ACTION
+
+EJEMPLOS DE APPLIANCE_ACTION:
 "agrega batidora a mi cocina" -> APPLIANCE_ACTION
 "qué electrodomésticos tengo" -> APPLIANCE_ACTION
+"tengo horno" -> APPLIANCE_ACTION
+
+EJEMPLOS DE RECIPE_SEARCH:
 "receta de arroz blanco" -> RECIPE_SEARCH
 "llévame a la receta de ceviche" -> RECIPE_SEARCH
+"busca pizza" -> RECIPE_SEARCH
+
+EJEMPLOS DE COOKING_CONTROL:
 "siguiente paso" -> COOKING_CONTROL
+"repite" -> COOKING_CONTROL
+"timer de 5 minutos" -> COOKING_CONTROL
+
+EJEMPLOS DE GENERAL_QUESTION:
 "hola" -> GENERAL_QUESTION
-"ir a mis recetas" -> NAVIGATION
+"cómo se pica cebolla" -> GENERAL_QUESTION
+"qué puedo cocinar" -> GENERAL_QUESTION
 `;
 
 export async function POST(request: NextRequest) {

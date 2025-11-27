@@ -101,18 +101,18 @@ export const llmFunctions: FunctionDefinition[] = [
   // ==========================================================================
   {
     name: 'getInventory',
-    description: 'Obtiene el inventario actual del usuario (lo que tiene en su cocina).',
+    description: 'Obtiene el inventario actual del usuario (lo que tiene en su cocina). IMPORTANTE: USA ESTA FUNCIÓN cuando el usuario pregunta "qué hay en el inventario", "ver inventario", "muéstrame mi inventario", "cuántos X tengo", "tengo Y", o cualquier consulta sobre ingredientes disponibles. Esta función devuelve TODOS los ingredientes del usuario. Si está vacío, devolverá { items: [], totalItems: 0 }.',
     parameters: {
       type: 'object',
       properties: {
         location: {
           type: 'string',
-          description: 'Filtrar por ubicación',
+          description: 'Filtrar por ubicación (OPCIONAL - solo usa si el usuario lo especifica)',
           enum: ['Refrigerador', 'Congelador', 'Alacena'],
         },
         expiringWithinDays: {
           type: 'number',
-          description: 'Solo mostrar items que caducan en los próximos X días',
+          description: 'Solo mostrar items que caducan en los próximos X días (OPCIONAL)',
         },
       },
       required: [],
