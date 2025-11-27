@@ -520,6 +520,56 @@ export const llmFunctions: FunctionDefinition[] = [
     },
   },
   // ==========================================================================
+  // APPLIANCE FUNCTIONS
+  // ==========================================================================
+  {
+    name: 'getUserAppliances',
+    description: 'Obtiene la lista de electrodomésticos que el usuario tiene registrados en Mi Cocina.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'searchAppliances',
+    description: 'Busca electrodomésticos en el catálogo por nombre o categoría. Usa esta función cuando el usuario quiera agregar un electrodoméstico a su cocina.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Término de búsqueda (nombre o tipo de electrodoméstico, ej: "batidora", "licuadora", "horno")',
+        },
+        category: {
+          type: 'string',
+          description: 'Filtrar por categoría de electrodoméstico',
+          enum: ['Cocción', 'Refrigeración', 'Procesamiento', 'Preparación', 'Otros'],
+        },
+        limit: {
+          type: 'number',
+          description: 'Número máximo de resultados (default: 10)',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'hasAppliance',
+    description: 'Verifica si el usuario tiene un electrodoméstico específico en su cocina.',
+    parameters: {
+      type: 'object',
+      properties: {
+        applianceName: {
+          type: 'string',
+          description: 'Nombre del electrodoméstico a verificar (ej: "licuadora", "horno")',
+        },
+      },
+      required: ['applianceName'],
+    },
+  },
+
+  // ==========================================================================
   // APPLIANCE ADAPTATION FUNCTIONS
   // ==========================================================================
   {

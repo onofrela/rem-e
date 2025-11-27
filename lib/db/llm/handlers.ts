@@ -52,6 +52,31 @@ export interface FunctionResult {
 }
 
 // =============================================================================
+// ENVIRONMENT CHECK
+// =============================================================================
+
+/**
+ * Check if we're running on the server (Node.js) or client (browser)
+ */
+function isServer(): boolean {
+  return typeof window === 'undefined';
+}
+
+/**
+ * Wrapper to handle IndexedDB not being available on server
+ */
+async function safeExecute<T>(fn: () => Promise<T>, fallbackData?: T): Promise<T> {
+  if (isServer()) {
+    console.warn('[Handlers] Running on server - IndexedDB not available, using fallback');
+    if (fallbackData !== undefined) {
+      return fallbackData;
+    }
+    throw new Error('IndexedDB not available on server');
+  }
+  return fn();
+}
+
+// =============================================================================
 // INGREDIENT HANDLERS
 // =============================================================================
 
@@ -76,9 +101,19 @@ async function handleSearchIngredients(args: Record<string, unknown>): Promise<F
       })),
     };
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Error searching ingredients';
+
+    // Si el error es por IndexedDB not defined (servidor), retornar mensaje claro
+    if (errorMessage.includes('indexedDB') || errorMessage.includes('IndexedDB')) {
+      return {
+        success: false,
+        error: 'Lo siento, no puedo acceder a la base de datos de ingredientes desde el servidor. Por favor, asegúrate de que la aplicación esté cargada en el navegador.',
+      };
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Error searching ingredients',
+      error: errorMessage,
     };
   }
 }

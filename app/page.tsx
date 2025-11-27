@@ -199,16 +199,16 @@ export default function Home() {
               </Card>
             </Link>
 
-            {/* Learn - 1x1 tile */}
-            <Link href="/learn" className="col-span-1 row-span-1">
+            {/* Mi Cocina - 1x1 tile */}
+            <Link href="/mi-cocina" className="col-span-1 row-span-1">
               <Card variant="elevated" padding="lg" hoverable className="h-full animate-fadeInUp stagger-4 flex flex-col justify-center items-center text-center gap-2 md:gap-3">
-                <span className="text-5xl md:text-6xl lg:text-7xl">🎓</span>
+                <span className="text-5xl md:text-6xl lg:text-7xl">🍜</span>
                 <div>
                   <h3 className="text-base md:text-xl lg:text-2xl font-semibold text-gray-800">
-                    Aprender
+                    Mi Cocina
                   </h3>
                   <p className="text-sm md:text-base lg:text-lg text-gray-600 mt-1 md:mt-2">
-                    Habilidades
+                    Electrodomésticos
                   </p>
                 </div>
               </Card>

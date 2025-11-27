@@ -5,25 +5,33 @@ const LM_STUDIO_URL = process.env.NEXT_PUBLIC_LM_STUDIO_URL || process.env.LM_ST
 
 const CLASSIFICATION_SYSTEM_PROMPT = `
 Eres un clasificador de intenciones para un asistente de cocina.
-Tu ÚNICO trabajo es clasificar el texto del usuario en una de las siguientes categorías.
-Responde SOLO con el nombre de la categoría. Nada más.
+Tu ÚNICO trabajo es clasificar el texto del usuario en UNA categoría.
+Responde SOLO con la categoría. Nada más. Una palabra.
 
 CATEGORÍAS:
-1. NAVIGATION: El usuario quiere ir a una pantalla específica (ej: "ir a inicio", "ver mis recetas", "abrir inventario", "ir a mi cocina").
-2. INVENTORY_ACTION: El usuario quiere modificar su inventario (ej: "agrega 3 tomates", "borra leche", "tengo manzanas").
-3. RECIPE_SEARCH: El usuario busca una receta específica o ideas (ej: "receta de arroz", "qué puedo cocinar con pollo", "busca receta de pizza").
-4. COOKING_CONTROL: Comandos de control mientras cocina (ej: "siguiente paso", "repite", "cuánto tiempo falta", "pon un timer").
-5. GENERAL_QUESTION: Preguntas generales o conversación (ej: "hola", "¿qué eres?", "dame un tip de cocina").
+1. NAVIGATION - Navegar a una sección SIN hacer nada más (ej: "abre inventario", "ir a recetas", "llévame a inicio")
+2. INVENTORY_ACTION - Agregar/modificar/consultar inventario (ej: "agrega tomates", "cuánta leche tengo", "borra manzanas")
+3. APPLIANCE_ACTION - Agregar/modificar/consultar electrodomésticos de Mi Cocina (ej: "agrega batidora", "tengo horno", "qué electrodomésticos tengo")
+4. RECIPE_SEARCH - Buscar/navegar a UNA receta específica (ej: "receta de arroz blanco", "llévame a ceviche", "busca pizza")
+5. COOKING_CONTROL - Control durante cocina activa (ej: "siguiente paso", "repite", "timer de 5 minutos")
+6. GENERAL_QUESTION - Preguntas/conversación general (ej: "hola", "cómo se pica cebolla", "qué puedo cocinar")
+
+REGLAS CRÍTICAS:
+- Si dice "agregar/añadir [cosa] a mi cocina/inventario" → Es ACCIÓN (INVENTORY_ACTION o APPLIANCE_ACTION), NO navegación
+- Si menciona un plato específico (ej: "arroz blanco", "ceviche") → RECIPE_SEARCH
+- Si solo dice "ir/abre/muestra [sección]" sin agregar/buscar nada → NAVIGATION
 
 EJEMPLOS:
-"ir a inventario" -> NAVIGATION
-"agrega 2 litros de leche" -> INVENTORY_ACTION
-"quiero cocinar algo con huevo" -> RECIPE_SEARCH
+"abre inventario" -> NAVIGATION
+"agrega 3 tomates" -> INVENTORY_ACTION
+"cuántos tomates tengo" -> INVENTORY_ACTION
+"agrega batidora a mi cocina" -> APPLIANCE_ACTION
+"qué electrodomésticos tengo" -> APPLIANCE_ACTION
+"receta de arroz blanco" -> RECIPE_SEARCH
+"llévame a la receta de ceviche" -> RECIPE_SEARCH
 "siguiente paso" -> COOKING_CONTROL
-"cómo se corta la cebolla" -> GENERAL_QUESTION
-"ve a mi cocina" -> NAVIGATION
-"añadir batidora a mi cocina" -> INVENTORY_ACTION (Aunque dice "cocina", es una acción de agregar equipo)
-"receta de pastel de chocolate" -> RECIPE_SEARCH
+"hola" -> GENERAL_QUESTION
+"ir a mis recetas" -> NAVIGATION
 `;
 
 export async function POST(request: NextRequest) {
@@ -65,9 +73,12 @@ export async function POST(request: NextRequest) {
         let finalClassification = 'GENERAL_QUESTION';
         if (classification.includes('NAVIGATION')) finalClassification = 'NAVIGATION';
         else if (classification.includes('INVENTORY_ACTION')) finalClassification = 'INVENTORY_ACTION';
+        else if (classification.includes('APPLIANCE_ACTION')) finalClassification = 'APPLIANCE_ACTION';
         else if (classification.includes('RECIPE_SEARCH')) finalClassification = 'RECIPE_SEARCH';
         else if (classification.includes('COOKING_CONTROL')) finalClassification = 'COOKING_CONTROL';
         else if (classification.includes('GENERAL_QUESTION')) finalClassification = 'GENERAL_QUESTION';
+
+        console.log(`[Classify] "${text}" -> ${finalClassification}`);
 
         return NextResponse.json({ classification: finalClassification });
 

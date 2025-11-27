@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LMStudioClient } from '@/lib/db/llm/client';
 import { getFunctionDefinitions } from '@/lib/db/llm/functions';
-import { executeFunction, type FunctionResult } from '@/lib/db/llm/handlers';
+import { type FunctionResult } from '@/lib/db/llm/handlers';
 
 // =============================================================================
 // TYPES
@@ -32,18 +32,31 @@ interface AssistantRequest {
     sessionId?: string;
   };
   conversationId?: string;
+  classification?: string; // NAVIGATION, INVENTORY_ACTION, APPLIANCE_ACTION, RECIPE_SEARCH, COOKING_CONTROL, GENERAL_QUESTION
+  // Para el flujo híbrido donde el cliente ejecuta funciones
+  toolResults?: Array<{
+    tool_call_id: string;
+    result: FunctionResult;
+  }>;
 }
 
 type ErrorType = 'lm_studio' | 'function_error' | 'nextjs_api' | 'unknown';
 
 interface AssistantResponse {
   success: boolean;
-  response: string;
-  functionsCalled: {
+  response?: string; // Opcional porque podría estar esperando tool_calls
+  functionsCalled?: {
     name: string;
     args: Record<string, unknown>;
     result: FunctionResult;
   }[];
+  // Para el flujo híbrido: devolver tool_calls para que el cliente las ejecute
+  toolCallsPending?: Array<{
+    id: string;
+    name: string;
+    args: Record<string, unknown>;
+  }>;
+  conversationState?: ConversationMessage[]; // Estado de la conversación para continuar
   error?: string;
   errorType?: ErrorType;
 }
@@ -63,6 +76,18 @@ const SYSTEM_PROMPT = `Eres Rem-E, un asistente de cocina inteligente y amigable
 5. **Cocinar paso a paso**: Guiar al usuario durante la preparación de recetas.
 6. **Planificar comidas**: Ayudar a organizar las comidas de la semana.
 
+**REGLA CRÍTICA DE PRIORIZACIÓN:**
+1. **PRIMERO**: Identifica si el usuario quiere HACER algo (agregar, modificar, buscar datos) - USA FUNCIONES
+2. **SEGUNDO**: Solo después, considera si quiere NAVEGAR a alguna sección
+3. Ejemplos de ACCIONES (usar funciones):
+   - "agregar ingredientes" → addToInventory
+   - "agregar batidora a mi cocina" → searchAppliances + addApplianceToKitchen
+   - "receta de arroz blanco" → searchRecipes + navigateToRecipe
+   - "cuántos tomates tengo" → getInventory
+4. Ejemplos de NAVEGACIÓN simple (sin funciones):
+   - "llévame a inventario" (solo navegación)
+   - "abre mis recetas" (solo navegación)
+
 **Directrices de comportamiento:**
 - Responde siempre en español de México.
 - Sé conciso pero informativo. Las respuestas deben ser cortas para ser leídas en voz alta.
@@ -74,14 +99,31 @@ const SYSTEM_PROMPT = `Eres Rem-E, un asistente de cocina inteligente y amigable
 - Sugiere alternativas cuando falten ingredientes o electrodomésticos.
 
 **Para acciones de inventario (agregar, modificar):**
-- CRÍTICO: Antes de llamar a addToInventory, DEBES verificar que tienes TODOS estos datos:
-  1. **Ingrediente**: Usa searchIngredients para encontrar el ingredientId exacto.
-  2. **Cantidad**: Número (ej: 3, 2.5). Si el usuario no especifica, pregunta "¿Cuántos/cuántas?".
-  3. **Unidad**: Por defecto "piezas" si no se especifica. Otras: g, kg, ml, L, etc.
-  4. **Ubicación**: REQUERIDO. Debe ser "Refrigerador", "Congelador", o "Alacena". Si el usuario no lo menciona, pregunta "¿Dónde lo guardas?".
-- Si falta algún dato, pregunta específicamente por ese dato. NO llames a addToInventory hasta tener todo.
-- Ejemplo correcto: Usuario dice "agrega 3 tomates a mi inventario" -> Falta ubicación -> Preguntas "¿Dónde? ¿Refrigerador, congelador o alacena?"
-- Después de agregar, confirma brevemente (ej: "Listo, agregué 3 tomates al refrigerador").
+- FLUJO OBLIGATORIO:
+  1. **PRIMERO**: SIEMPRE llama a searchIngredients para verificar que existe y obtener ingredientId
+  2. **DESPUÉS**: Verifica datos faltantes:
+     - Cantidad: Si falta, pregunta "¿Cuántos/cuántas?"
+     - Unidad: Default "piezas" (o kg/g/ml/L según corresponda)
+     - Ubicación: Si falta, pregunta "¿Dónde lo guardas? ¿Refrigerador, congelador o alacena?"
+  3. **FINALMENTE**: Cuando tengas TODO, llama a addToInventory
+
+- EJEMPLO CORRECTO:
+  Usuario: "agrega 3 tomates"
+  1. searchIngredients("tomate") → obtiene ingredientId
+  2. Detecta que falta ubicación
+  3. Pregunta: "¿Dónde los guardas? ¿Refrigerador, congelador o alacena?"
+
+- NUNCA preguntes sin haber buscado el ingrediente primero
+- Después de agregar, confirma: "Listo, agregué 3 tomates al refrigerador"
+
+**Para acciones de cocina/electrodomésticos (agregar a Mi Cocina):**
+- CRÍTICO: Cuando el usuario diga "agregar [electrodoméstico] a mi cocina":
+  1. Usa searchAppliances para buscar el electrodoméstico (ej: "batidora eléctrica")
+  2. Si encuentras 1 resultado, usa addApplianceToKitchen con ese applianceId
+  3. Si encuentras varios, pregunta cuál específicamente
+  4. Si no encuentras ninguno, di que no existe en el catálogo
+- NUNCA confundas "agregar a mi cocina" con "navegar a cocina"
+- Ejemplo: "agregar batidora eléctrica" → searchAppliances("batidora") → addApplianceToKitchen(applianceId)
 
 **Para navegación a recetas específicas:**
 - CRÍTICO: Si el usuario menciona un plato/comida específico con palabras como "receta de/para/del", "cocinar", "hacer", "preparar" seguido de un nombre (ej: "ceviche de camarón", "arroz blanco", "pollo asado"), SIEMPRE es una receta específica.
@@ -197,19 +239,59 @@ async function callLMStudio(
 export async function POST(request: NextRequest): Promise<NextResponse<AssistantResponse>> {
   try {
     const body: AssistantRequest = await request.json();
-    const { text, context, conversationId = 'default' } = body;
+    const { text, context, conversationId = 'default', classification, toolResults } = body;
 
-    if (!text || typeof text !== 'string') {
+    // Validar request
+    if (!text && !toolResults) {
       return NextResponse.json({
         success: false,
-        response: 'No se proporcionó texto',
-        functionsCalled: [],
-        error: 'Missing text parameter',
+        response: 'No se proporcionó texto ni resultados de herramientas',
+        error: 'Missing text or toolResults parameter',
       }, { status: 400 });
     }
 
-    // Build context string if provided
+    // Build context string with classification
     let contextString = '';
+
+    // Add classification-specific instructions
+    if (classification) {
+      contextString += `\n\n[CLASIFICACIÓN: ${classification}]\n`;
+
+      switch (classification) {
+        case 'INVENTORY_ACTION':
+          contextString += `INSTRUCCIONES ESPECÍFICAS PARA AGREGAR AL INVENTARIO:
+
+FLUJO OBLIGATORIO:
+1. **PRIMERO**: Llama a searchIngredients con el nombre del ingrediente para obtener el ingredientId
+2. **DESPUÉS**: Verifica datos requeridos:
+   - Cantidad: Si falta → pregunta "¿Cuántos/cuántas?"
+   - Unidad: Default "piezas" (o kg/g/ml/L según corresponda)
+   - Ubicación: Si falta → pregunta "¿Dónde lo guardas? ¿Refrigerador, congelador o alacena?"
+3. **FINALMENTE**: Cuando tengas TODO (ingredientId, cantidad, unidad, ubicación), llama a addToInventory
+
+IMPORTANTE: Las funciones se ejecutan en el cliente (navegador), donde está IndexedDB. Úsalas normalmente.`;
+          break;
+
+        case 'APPLIANCE_ACTION':
+          contextString += `INSTRUCCIONES ESPECÍFICAS:
+- Usa searchAppliances para buscar el electrodoméstico
+- Si encuentras 1 resultado, usa addApplianceToKitchen
+- Si encuentras varios, pregunta cuál específicamente
+- Si no encuentras ninguno, informa que no existe en el catálogo`;
+          break;
+
+        case 'RECIPE_SEARCH':
+          contextString += `INSTRUCCIONES ESPECÍFICAS:
+- Extrae el nombre del plato de la consulta
+- Usa searchRecipes con ese nombre
+- Si encuentras 1 resultado, usa navigateToRecipe inmediatamente
+- Si encuentras 2-3, menciona nombres y pregunta cuál
+- Si encuentras 4+, menciona los primeros 3 y pregunta
+- Si no encuentras ninguno, di que no existe`;
+          break;
+      }
+    }
+
     if (context) {
       if (context.inRecipeGuide && context.recipeName) {
         contextString += `\n\n[MODO GUÍA DE COCINA ACTIVO]
@@ -238,96 +320,118 @@ IMPORTANTE:
     // Get or create conversation
     const conversation = getConversation(conversationId);
 
-    // Build messages array
+    // ==========================================================================
+    // CASO 1: El cliente está enviando resultados de herramientas ejecutadas
+    // ==========================================================================
+    if (toolResults && toolResults.length > 0) {
+      console.log('[Assistant API] Recibiendo resultados de herramientas ejecutadas en cliente');
+
+      // Agregar resultados de herramientas a la conversación
+      for (const toolResult of toolResults) {
+        const toolMessage: ConversationMessage = {
+          role: 'tool',
+          tool_call_id: toolResult.tool_call_id,
+          content: JSON.stringify(toolResult.result),
+        };
+        addToConversation(conversationId, toolMessage);
+      }
+
+      // Llamar al LLM de nuevo con los resultados
+      const updatedMessages: ConversationMessage[] = [
+        { role: 'system', content: SYSTEM_PROMPT + contextString },
+        ...getConversation(conversationId),
+      ];
+
+      const response = await callLMStudio(updatedMessages);
+      const assistantMessage = response.choices[0].message;
+
+      // Si el LLM devuelve MÁS tool_calls, devolverlos al cliente
+      if (response.choices[0].finish_reason === 'tool_calls' && assistantMessage.tool_calls) {
+        addToConversation(conversationId, assistantMessage);
+
+        const toolCallsPending = assistantMessage.tool_calls.map(tc => ({
+          id: tc.id,
+          name: tc.function.name,
+          args: JSON.parse(tc.function.arguments || '{}'),
+        }));
+
+        console.log('[Assistant API] LLM solicita más herramientas:', toolCallsPending.map(tc => tc.name).join(', '));
+
+        return NextResponse.json({
+          success: true,
+          toolCallsPending,
+          conversationState: getConversation(conversationId),
+        });
+      }
+
+      // Si no hay más tool_calls, devolver respuesta final
+      const finalResponse = assistantMessage.content || 'No pude generar una respuesta.';
+      addToConversation(conversationId, {
+        role: 'assistant',
+        content: finalResponse,
+      });
+
+      console.log(`[Assistant API] Respuesta final: ${finalResponse.substring(0, 100)}...`);
+
+      return NextResponse.json({
+        success: true,
+        response: finalResponse,
+      });
+    }
+
+    // ==========================================================================
+    // CASO 2: Nueva consulta del usuario
+    // ==========================================================================
     const messages: ConversationMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT + contextString },
       ...conversation,
-      { role: 'user', content: text },
+      { role: 'user', content: text! },
     ];
 
     console.log('--- [Assistant API Debug] ---');
     console.log('Context received:', JSON.stringify(context, null, 2));
     console.log('Conversation ID:', conversationId);
     console.log('System Prompt Suffix:', contextString);
-    console.log('Full Messages to LLM:', JSON.stringify(messages, null, 2));
     console.log('-----------------------------');
 
     // Add user message to conversation history
-    addToConversation(conversationId, { role: 'user', content: text });
-
-    const functionsCalled: AssistantResponse['functionsCalled'] = [];
+    addToConversation(conversationId, { role: 'user', content: text! });
 
     // Call LM Studio
-    let response = await callLMStudio(messages);
-    let assistantMessage = response.choices[0].message;
+    const response = await callLMStudio(messages);
+    const assistantMessage = response.choices[0].message;
 
-    // Handle tool calls in a loop
-    let iterations = 0;
-    const maxIterations = 5; // Prevent infinite loops
-
-    while (response.choices[0].finish_reason === 'tool_calls' && iterations < maxIterations) {
-      iterations++;
-
-      // Add assistant message with tool calls to conversation
+    // Si el LLM solicita herramientas, devolver al cliente para que las ejecute
+    if (response.choices[0].finish_reason === 'tool_calls' && assistantMessage.tool_calls) {
       addToConversation(conversationId, assistantMessage);
 
-      // Execute each tool call
-      for (const toolCall of assistantMessage.tool_calls || []) {
-        const functionName = toolCall.function.name;
-        let args: Record<string, unknown> = {};
+      const toolCallsPending = assistantMessage.tool_calls.map(tc => ({
+        id: tc.id,
+        name: tc.function.name,
+        args: JSON.parse(tc.function.arguments || '{}'),
+      }));
 
-        try {
-          args = JSON.parse(toolCall.function.arguments);
-        } catch {
-          args = {};
-        }
+      console.log('[Assistant API] LLM solicita herramientas (ejecutar en cliente):', toolCallsPending.map(tc => tc.name).join(', '));
 
-        console.log(`[Assistant API] Calling function: ${functionName}`, args);
-
-        // Execute the function
-        const result = await executeFunction(functionName, args);
-
-        functionsCalled.push({
-          name: functionName,
-          args,
-          result,
-        });
-
-        // Add tool result to conversation
-        const toolMessage: ConversationMessage = {
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          content: JSON.stringify(result),
-        };
-        addToConversation(conversationId, toolMessage);
-      }
-
-      // Call LM Studio again with tool results
-      const updatedMessages: ConversationMessage[] = [
-        { role: 'system', content: SYSTEM_PROMPT + contextString },
-        ...getConversation(conversationId),
-      ];
-
-      response = await callLMStudio(updatedMessages);
-      assistantMessage = response.choices[0].message;
+      return NextResponse.json({
+        success: true,
+        toolCallsPending,
+        conversationState: getConversation(conversationId),
+      });
     }
 
-    // Get final response text
+    // Si no hay tool_calls, devolver respuesta directa
     const finalResponse = assistantMessage.content || 'No pude generar una respuesta.';
-
-    // Add final assistant message to conversation
     addToConversation(conversationId, {
       role: 'assistant',
       content: finalResponse,
     });
 
-    console.log(`[Assistant API] Response: ${finalResponse.substring(0, 100)}...`);
-    console.log(`[Assistant API] Functions called: ${functionsCalled.map(f => f.name).join(', ') || 'none'}`);
+    console.log(`[Assistant API] Respuesta sin herramientas: ${finalResponse.substring(0, 100)}...`);
 
     return NextResponse.json({
       success: true,
       response: finalResponse,
-      functionsCalled,
     });
 
   } catch (error) {

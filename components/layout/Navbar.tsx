@@ -15,7 +15,8 @@ import {
   Library,
   ChefHat,
   History,
-  LucideIcon
+  LucideIcon,
+  BookOpenCheck
 } from 'lucide-react';
 
 interface NavItem {
@@ -31,7 +32,7 @@ const navItems: NavItem[] = [
   { id: 'inventory', label: 'Inventario', icon: Package, href: '/inventory' },
   { id: 'mi-cocina', label: 'Mi Cocina', icon: ChefHat, href: '/mi-cocina' },
   { id: 'locations', label: 'Ubicaciones', icon: MapPin, href: '/locations' },
-  { id: 'glossary', label: 'Glosario', icon: Library, href: '/glossary' },
+  { id: 'glossary', label: 'Glosario', icon: BookOpenCheck, href: '/glossary' },
   { id: 'recipes', label: 'Recetas', icon: BookOpen, href: '/recipes' },
   { id: 'history', label: 'Historial', icon: History, href: '/history' },
   { id: 'plan', label: 'Planificar', icon: Calendar, href: '/plan' },
@@ -221,11 +222,8 @@ export const Navbar: React.FC = () => {
                       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
                     )}
 
-                    {/* Icon with filled style */}
-                    <Icon
-                      className={`w-6 h-6 ${active ? 'fill-white' : 'fill-[var(--color-primary)]'}`}
-                      strokeWidth={0}
-                    />
+                    {/* Icon with outline style */}
+                    <Icon className={`w-6 h-6 ${active ? 'text-white' : 'text-[var(--color-text-primary)]'}`} />
 
                     <span className={`text-lg font-semibold ${active ? 'text-white' : 'text-[var(--color-text-primary)]'}`}>
                       {item.label}

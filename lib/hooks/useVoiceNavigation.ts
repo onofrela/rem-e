@@ -92,6 +92,7 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
   const [executingFunction] = useState<string | null>(null);
   const [currentContext, setCurrentContext] = useState<VoiceContext>({});
   const [conversationMode, setConversationMode] = useState(false);
+  const [conversationId, setConversationId] = useState<string>('default');
   const lastLLMWasQuestionRef = useRef(false);
 
   const recognitionRef = useRef<any | null>(null);
@@ -128,55 +129,22 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
     }
     return text;
   }, []);
-  async function handleLLMClassification(text: string) {
-    const res = await fetch('/api/classify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    });
+  // Clasificar intent usando el LLM
+  const classifyWithLLM = useCallback(async (text: string): Promise<string> => {
+    try {
+      const res = await fetch('/api/assistant/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
 
-    const data = await res.json();
-    return data.classification; // NAVIGATION, INVENTORY_ACTION, RECIPE_SEARCH, COOKING_CONTROL, GENERAL_QUESTION
-  }
-
-  // Clasificar intent: navegación vs pregunta
-  const classifyIntent = useCallback((text: string): { type: 'navigation' | 'question'; route?: string } => {
-    const lowerText = text.toLowerCase().trim();
-
-    // Palabras que indican pregunta
-    const questionIndicators = [
-      'qué', 'que', 'cuánto', 'cuanto', 'cuánta', 'cuanta',
-      'cuántos', 'cuantos', 'cuántas', 'cuantas',
-      'cómo', 'como', 'dónde', 'donde', 'por qué', 'porque',
-      'tengo', 'hay', 'puedo', 'necesito', 'falta', 'busca',
-      'buscar', 'encuentra', 'encontrar', 'dame', 'dime',
-      'cuál', 'cual', 'sería', 'seria', 'explica', 'recomienda'
-    ];
-
-    const isQuestion = questionIndicators.some(q => lowerText.includes(q));
-
-    // Verbos de navegación
-    const navigationVerbs = ['ve a', 'ir a', 'abre', 'muestra', 'navega'];
-    const hasNavVerb = navigationVerbs.some(v => lowerText.includes(v));
-
-    // Si tiene verbo de navegación explícito, es navegación
-    if (hasNavVerb) {
-      return { type: 'navigation' };
+      const data = await res.json();
+      console.log("[Voice] Clasificación LLM:", data.classification);
+      return data.classification; // NAVIGATION, INVENTORY_ACTION, APPLIANCE_ACTION, RECIPE_SEARCH, COOKING_CONTROL, GENERAL_QUESTION
+    } catch (error) {
+      console.error("[Voice] Error en clasificación:", error);
+      return 'GENERAL_QUESTION'; // Fallback
     }
-
-    // Si es pregunta clara, es pregunta
-    if (isQuestion) {
-      return { type: 'question' };
-    }
-
-    // Buscar secciones de navegación específicas
-    const route = parseNavigationCommand(text);
-    if (route) {
-      return { type: 'navigation', route: route.path };
-    }
-
-    // Por defecto, es pregunta
-    return { type: 'question' };
   }, []);
 
   // Detectar comandos de cocina
@@ -248,48 +216,197 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
     wakeWordDetectedRef.current = false;
   }, []);
 
-  // Procesar pregunta con LLM
-  const processQuestion = useCallback(async (question: string) => {
-    console.log("[Voice] Procesando pregunta con LLM:", question);
-    setLastCommand(question);
+  // Procesar comando basado en clasificación LLM (con ejecución de handlers en cliente)
+  const processCommand = useCallback(async (text: string, isFollowUp: boolean = false) => {
+    console.log("[Voice] Procesando comando:", text, "FollowUp:", isFollowUp);
+    setLastCommand(text);
     setStatus("thinking");
     setLlmResponse(null);
 
     try {
-      // Llamar a la API del asistente
-      const response = await fetch('/api/assistant', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: question,
-          context: currentContext,
-        }),
-      });
+      // Paso 1: Clasificar con el LLM (solo si no es follow-up)
+      let classification = 'GENERAL_QUESTION';
+      if (!isFollowUp) {
+        classification = await classifyWithLLM(text);
+        console.log("[Voice] Clasificación obtenida:", classification);
+      }
 
-      const data = await response.json();
+      // Paso 2: Manejar según clasificación
+      if (classification === 'NAVIGATION' && !isFollowUp) {
+        // Navegación simple - usar el sistema de navegación existente
+        const route = parseNavigationCommand(text);
+        if (route) {
+          console.log("[Voice] Navegación detectada:", route.path);
+          setLastNavigation(route);
+          router.push(route.path);
+          setStatus("listening");
+          wakeWordDetectedRef.current = false;
+          return;
+        }
+      }
 
-      if (data.success) {
-        setLlmResponse({
-          question,
-          response: data.response,
-          timestamp: Date.now(),
+      // Paso 3: Para todo lo demás, llamar al asistente con funciones (flujo híbrido)
+      let currentText = text;
+      let maxIterations = 5;
+      let iterations = 0;
+
+      while (iterations < maxIterations) {
+        iterations++;
+
+        const response = await fetch('/api/assistant', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: currentText,
+            context: currentContext,
+            conversationId: conversationId,
+            classification: classification,
+          }),
         });
-        if (data.response.trim().endsWith('?')) {
-          setConversationMode(true);
-          lastLLMWasQuestionRef.current = true;
-        } else {
-          setConversationMode(false);
-          lastLLMWasQuestionRef.current = false;
+
+        const data = await response.json();
+
+        if (!data.success) {
+          setError(createVoiceError("unknown", data.error || "Error al procesar la pregunta"));
+          break;
         }
 
-        console.log("[Voice] Respuesta LLM:", data.response);
-        console.log("[Voice] Funciones ejecutadas:", data.functionsCalled?.map((f: any) => f.name).join(', ') || 'ninguna');
-      } else {
-        // Error del asistente
-        setError(createVoiceError("unknown", data.error || "Error al procesar la pregunta"));
+        // CASO A: El LLM devolvió una respuesta final (sin tool_calls)
+        if (data.response) {
+          setLlmResponse({
+            question: text,
+            response: data.response,
+            timestamp: Date.now(),
+          });
+
+          // Detectar si el LLM está haciendo una pregunta para activar modo conversación
+          const responseText = data.response.toLowerCase();
+          const isLLMQuestion =
+            data.response.trim().endsWith('?') ||
+            responseText.includes('¿') ||
+            responseText.includes('dónde') ||
+            responseText.includes('cuál') ||
+            responseText.includes('cuáles') ||
+            responseText.includes('cuánto') ||
+            responseText.includes('cuántos') ||
+            responseText.includes('cuánta') ||
+            responseText.includes('cuántas') ||
+            (responseText.includes('donde ') && !responseText.includes('donde.')) ||
+            (responseText.includes('cual ') && !responseText.includes('cual.')) ||
+            responseText.includes('guardas') ||
+            (responseText.includes('refrigerador') && responseText.includes('congelador') && responseText.includes('alacena'));
+
+          if (isLLMQuestion) {
+            setConversationMode(true);
+            lastLLMWasQuestionRef.current = true;
+            console.log("[Voice] Modo conversación ACTIVADO - LLM hizo una pregunta:", data.response);
+          } else {
+            if (!isFollowUp) {
+              setConversationMode(false);
+              lastLLMWasQuestionRef.current = false;
+              console.log("[Voice] Modo conversación DESACTIVADO - respuesta completada");
+            }
+          }
+
+          console.log("[Voice] Respuesta LLM:", data.response);
+          break; // Salir del loop
+        }
+
+        // CASO B: El LLM solicita ejecutar tool_calls
+        if (data.toolCallsPending && data.toolCallsPending.length > 0) {
+          console.log("[Voice] Ejecutando herramientas en cliente:", data.toolCallsPending.map((tc: any) => tc.name).join(', '));
+
+          // Importar dinámicamente el ejecutor de handlers del cliente
+          const { executeClientFunction } = await import('@/lib/db/llm/clientHandlers');
+
+          // Ejecutar cada tool_call en el cliente
+          const toolResults = [];
+          for (const toolCall of data.toolCallsPending) {
+            console.log(`[Voice] Ejecutando: ${toolCall.name}`, toolCall.args);
+            const result = await executeClientFunction(toolCall.name, toolCall.args);
+
+            toolResults.push({
+              tool_call_id: toolCall.id,
+              result,
+            });
+
+            // Si es navigateToRecipe, navegar inmediatamente
+            if (toolCall.name === 'navigateToRecipe' && result.success && result.data) {
+              const navData = result.data as { url?: string; recipeName?: string; recipeId?: string };
+              if (navData.url) {
+                console.log("[Voice] Navegando a:", navData.url);
+                router.push(navData.url);
+              }
+            }
+          }
+
+          // Enviar resultados de vuelta al servidor
+          const responseWithResults = await fetch('/api/assistant', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: '', // No hay nuevo texto del usuario
+              context: currentContext,
+              conversationId: conversationId,
+              toolResults, // Enviar resultados de las herramientas
+            }),
+          });
+
+          const dataWithResults = await responseWithResults.json();
+
+          if (!dataWithResults.success) {
+            setError(createVoiceError("unknown", dataWithResults.error || "Error procesando resultados"));
+            break;
+          }
+
+          // Si el servidor devuelve una respuesta final, mostrarla
+          if (dataWithResults.response) {
+            setLlmResponse({
+              question: text,
+              response: dataWithResults.response,
+              timestamp: Date.now(),
+            });
+
+            const responseText = dataWithResults.response.toLowerCase();
+            const isLLMQuestion =
+              dataWithResults.response.trim().endsWith('?') ||
+              responseText.includes('¿') ||
+              responseText.includes('dónde') ||
+              responseText.includes('cuál');
+
+            if (isLLMQuestion) {
+              setConversationMode(true);
+              lastLLMWasQuestionRef.current = true;
+            } else {
+              if (!isFollowUp) {
+                setConversationMode(false);
+                lastLLMWasQuestionRef.current = false;
+              }
+            }
+
+            console.log("[Voice] Respuesta LLM final:", dataWithResults.response);
+            break;
+          }
+
+          // Si el servidor solicita MÁS tool_calls, continuar el loop
+          if (dataWithResults.toolCallsPending && dataWithResults.toolCallsPending.length > 0) {
+            console.log("[Voice] LLM solicita más herramientas, continuando...");
+            currentText = ''; // Limpio porque es continuación
+            continue;
+          }
+
+          // No hay más tool_calls ni respuesta, salir
+          break;
+        }
+
+        // Si llegamos aquí sin respuesta ni tool_calls, salir
+        break;
       }
+
     } catch (err) {
       console.error("[Voice] Error llamando al asistente:", err);
       setError(createVoiceError("unknown", "No se pudo conectar con el asistente"));
@@ -297,7 +414,7 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
       setStatus("listening");
       wakeWordDetectedRef.current = false;
     }
-  }, [currentContext]);
+  }, [currentContext, conversationId, classifyWithLLM, router]);
 
   // Manejar resultado de reconocimiento de voz
   const handleRecognitionResult = useCallback(
@@ -323,26 +440,20 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
           }
         }
 
-        if (conversationMode) {
-          console.log("[Voice] Conversation mode active, processing without wake word");
+        // Modo conversación: permite responder sin wake word
+        // IMPORTANTE: Esto debe verificarse ANTES de buscar wake word
+        if (conversationMode && lastLLMWasQuestionRef.current) {
+          console.log("[Voice] Conversation mode active, processing without wake word:", transcriptText);
 
-          const intent = classifyIntent(transcriptText);
-
-          // Si el usuario ya no responde a la pregunta → terminar conversación
-          if (!transcriptText.trim().endsWith('?')) {
-            setConversationMode(false);
-            lastLLMWasQuestionRef.current = false;
-          }
-
-          if (intent.type === 'navigation') {
-            processNavigation(transcriptText);
-          } else {
-            processQuestion(transcriptText);
-          }
+          // En modo conversación, asumimos que el usuario está respondiendo a la pregunta del LLM
+          // Por lo tanto, NO clasificamos como navegación, sino como pregunta de seguimiento
+          processCommand(transcriptText, true); // true = es follow-up
 
           setTranscript("");
+          // NO resetear wakeWordDetectedRef aquí, dejarlo como está
           return;
         }
+
         // Si aún no detectamos palabra de activación, buscarla
         if (!wakeWordDetectedRef.current) {
           if (detectWakeWord(transcriptText)) {
@@ -352,17 +463,7 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
             if (command) {
               // Si hay comando inmediatamente después de wake word, procesarlo
               console.log("[Voice] Wake word detected with command:", command);
-
-              // Clasificar intent
-              const intent = classifyIntent(command);
-              console.log("[Voice] Intent classification:", intent);
-
-              if (intent.type === 'navigation') {
-                processNavigation(command);
-              } else {
-                // Es una pregunta, procesarla con el LLM
-                processQuestion(command);
-              }
+              processCommand(command); // Clasificación se hace dentro de processCommand
             } else {
               // Solo wake word, esperar comando
               console.log("[Voice] Wake word detected, waiting for command");
@@ -377,21 +478,13 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
           setConversationMode(false);
           lastLLMWasQuestionRef.current = false;
 
-          // Clasificar intent
-          const intent = classifyIntent(transcriptText);
-          console.log("[Voice] Intent classification:", intent);
-
-          if (intent.type === 'navigation') {
-            processNavigation(transcriptText);
-          } else {
-            // Es una pregunta, procesarla con el LLM
-            processQuestion(transcriptText);
-          }
+          // Procesar comando (clasificación se hace dentro)
+          processCommand(transcriptText);
           setTranscript("");
         }
       }
     },
-    [detectWakeWord, extractCommand, classifyIntent, processNavigation, processQuestion, detectCookingCommand, processCookingCommand, currentContext.inRecipeGuide]
+    [detectWakeWord, extractCommand, processCommand, detectCookingCommand, processCookingCommand, currentContext.inRecipeGuide, conversationMode]
   );
 
   // Limpiar respuesta del LLM
@@ -400,7 +493,9 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
     setLastCommand("");
     setConversationMode(false);
     lastLLMWasQuestionRef.current = false;
-
+    // Generar nuevo ID de conversación para empezar un nuevo hilo
+    setConversationId(`conv_${Date.now()}`);
+    console.log("[Voice] Conversación limpiada - nuevo ID generado");
   }, []);
 
   // Limpiar error
