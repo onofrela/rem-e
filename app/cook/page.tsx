@@ -116,19 +116,6 @@ export default function CookPage() {
           ? error.message
           : 'Error al analizar la imagen. Asegúrate de que LM Studio esté corriendo.'
       );
-
-      // Fallback to mock API if real detection fails
-      try {
-        const detected = await api.detectIngredients(file);
-        setDetectedIngredients(detected);
-        const highConfidence = detected
-          .filter(d => d.confidence > 0.8)
-          .map(d => d.name);
-        setSelectedIngredients(prev => [...new Set([...prev, ...highConfidence])]);
-        setDetectionError('Usando detección simulada (LM Studio no disponible)');
-      } catch {
-        // If both fail, show error
-      }
     } finally {
       setIsDetecting(false);
     }

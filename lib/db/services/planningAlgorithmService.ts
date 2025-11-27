@@ -98,7 +98,7 @@ async function calculateRecipeScores(
       let prefCount = 0;
 
       // Cocinas preferidas
-      if (savedPrefs.preferredCuisines && savedPrefs.preferredCuisines.length > 0) {
+      if (savedPrefs.preferredCuisines && savedPrefs.preferredCuisines.length > 0 && recipe.cuisine) {
         const cuisineMatch = savedPrefs.preferredCuisines.includes(recipe.cuisine);
         prefScore += cuisineMatch ? 1 : 0.3;
         prefCount++;
@@ -418,7 +418,7 @@ Recuerda: Solo JSON puro en tu respuesta final, sin explicaciones.`;
   const response = result.response;
 
   console.log('🤖 LLM raw response:', response);
-  console.log('🔧 Function calls made:', result.functionCalls?.map(fc => ({ name: fc.name, args: fc.arguments })));
+  console.log('🔧 Function calls made:', result.functionCalls?.map(fc => ({ name: fc.name, result: fc.result })));
 
   // Parse LLM response with better error handling
   const meals = parseWeeklyMealsFromLLM(response, result.functionCalls);

@@ -161,5 +161,5 @@ export {
 // Cook Recommendation Service
 export {
   getTopRecommendedRecipes,
-  getRecipesByIngredients,
+  getRecipesByIngredients as getRecommendedRecipesByIngredients,
 } from './cookRecommendationService';
