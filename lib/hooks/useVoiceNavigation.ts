@@ -97,8 +97,12 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
   const [error, setError] = useState<VoiceError | null>(null);
   const [executingFunction] = useState<string | null>(null);
   const [currentContext, setCurrentContext] = useState<VoiceContext>({});
-  const [conversationMode, setConversationMode] = useState(false);
   const [conversationId, setConversationId] = useState<string>('default');
+
+  // IMPORTANTE: conversationMode usa ref para evitar stale closures
+  // pero también necesitamos un trigger state para el useEffect del timeout
+  const conversationModeRef = useRef(false);
+  const [conversationModeTrigger, setConversationModeTrigger] = useState(false);
   const lastLLMWasQuestionRef = useRef(false);
 
   const recognitionRef = useRef<any | null>(null);
@@ -331,13 +335,20 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
           const isLLMQuestion = isAssistantAskingQuestion(data.response);
 
           if (isLLMQuestion) {
-            setConversationMode(true);
+            conversationModeRef.current = true;
+            setConversationModeTrigger(true);
             lastLLMWasQuestionRef.current = true;
             shouldActivateConversation = true; // Marcar para activar en finally
+
+            // CRÍTICO: Resetear isProcessingCommandRef INMEDIATAMENTE
+            // para permitir que onend reinicie el recognition si se detiene
+            isProcessingCommandRef.current = false;
+
             console.log("[Voice] Modo conversación ACTIVADO - LLM hizo una pregunta:", data.response);
           } else {
             if (!isFollowUp) {
-              setConversationMode(false);
+              conversationModeRef.current = false;
+              setConversationModeTrigger(false);
               lastLLMWasQuestionRef.current = false;
               shouldActivateConversation = false;
               clearPending(); // Limpiar pending si la conversación terminó
@@ -502,13 +513,20 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
             const isLLMQuestion = isAssistantAskingQuestion(dataWithResults.response);
 
             if (isLLMQuestion) {
-              setConversationMode(true);
+              conversationModeRef.current = true;
+              setConversationModeTrigger(true);
               lastLLMWasQuestionRef.current = true;
               shouldActivateConversation = true; // Marcar para activar en finally
+
+              // CRÍTICO: Resetear isProcessingCommandRef INMEDIATAMENTE
+              // para permitir que onend reinicie el recognition si se detiene
+              isProcessingCommandRef.current = false;
+
               console.log("[Voice] Modo conversación ACTIVADO - LLM hizo una pregunta");
             } else {
               if (!isFollowUp) {
-                setConversationMode(false);
+                conversationModeRef.current = false;
+                setConversationModeTrigger(false);
                 lastLLMWasQuestionRef.current = false;
                 shouldActivateConversation = false;
                 clearPending();
@@ -539,34 +557,49 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
       console.error("[Voice] Error llamando al asistente:", err);
       setError(createVoiceError("unknown", "No se pudo conectar con el asistente"));
     } finally {
-      // Esperar un poco antes de volver a listening para dar tiempo al usuario
+      // Guardar el valor antes de cualquier timeout
+      const shouldRestart = shouldActivateConversation;
+
+      // Esperar un poco antes de volver a listening para dar tiempo a que el LLM termine
       setTimeout(() => {
         setStatus("listening");
         wakeWordDetectedRef.current = false;
-        isProcessingCommandRef.current = false;
 
-        // Si debemos activar modo conversación, reiniciar recognition manualmente
-        if (shouldActivateConversation && recognitionRef.current && !isListeningRef.current) {
-          try {
-            recognitionRef.current.start();
-            isListeningRef.current = true;
-            console.log("[Voice] ✅ Restarted recognition for conversation mode");
+        // Solo resetear si NO fue reseteado antes (por detección de pregunta)
+        if (isProcessingCommandRef.current) {
+          isProcessingCommandRef.current = false;
+          console.log("[Voice] Resetting isProcessingCommandRef in finally");
+        }
 
-            // ⏱️ IMPORTANTE: Iniciar timeout AQUÍ, después de reiniciar recognition
+        // Si debemos activar modo conversación, asegurarnos de que recognition esté activo
+        if (shouldRestart && recognitionRef.current) {
+          // Si NO está escuchando, reiniciar
+          if (!isListeningRef.current) {
+            try {
+              recognitionRef.current.start();
+              isListeningRef.current = true;
+              console.log("[Voice] ✅ Restarted recognition for conversation mode");
+
+              // ⏱️ IMPORTANTE: Iniciar timeout AQUÍ, después de reiniciar recognition
+              updateActivity();
+              console.log("[Timeout] ⏱️ Cuenta de 30s iniciada - el usuario puede responder ahora");
+            } catch (err) {
+              console.error("[Voice] Error restarting recognition:", err);
+            }
+          } else {
+            // Ya está escuchando (el onend lo reinició), solo activar timeout
             updateActivity();
+            console.log("[Voice] ✅ Recognition already active for conversation mode");
             console.log("[Timeout] ⏱️ Cuenta de 30s iniciada - el usuario puede responder ahora");
-          } catch (err) {
-            console.error("[Voice] Error restarting recognition:", err);
           }
         }
-      }, shouldActivateConversation ? 1000 : 500); // Más tiempo si es conversación
+      }, shouldRestart ? 1000 : 500); // Más tiempo si es conversación
     }
   }, [
     currentContext,
     conversationId,
     classifyWithLLM,
     router,
-    conversationMode,
     kitchenContext,
     setPendingIngredient,
     setPendingLocation,
@@ -602,7 +635,7 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
 
         // Modo conversación: permite responder sin wake word
         // IMPORTANTE: Esto debe verificarse ANTES de buscar wake word
-        if (conversationMode && lastLLMWasQuestionRef.current) {
+        if (conversationModeRef.current && lastLLMWasQuestionRef.current) {
           console.log("[Voice] Conversation mode active, processing without wake word:", transcriptText);
 
           // En modo conversación, asumimos que el usuario está respondiendo a la pregunta del LLM
@@ -635,7 +668,8 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
           // Ya detectamos wake word, este es el comando
           console.log("[Voice] Processing command after wake word:", transcriptText);
           // Si estábamos en conversación pero el usuario usó wake word, se resetea
-          setConversationMode(false);
+          conversationModeRef.current = false;
+          setConversationModeTrigger(false);
           lastLLMWasQuestionRef.current = false;
 
           // Procesar comando (clasificación se hace dentro)
@@ -644,14 +678,15 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
         }
       }
     },
-    [detectWakeWord, extractCommand, processCommand, detectCookingCommand, processCookingCommand, currentContext.inRecipeGuide, conversationMode]
+    [detectWakeWord, extractCommand, processCommand, detectCookingCommand, processCookingCommand, currentContext.inRecipeGuide]
   );
 
   // Limpiar respuesta del LLM
   const clearResponse = useCallback(() => {
     setLlmResponse(null);
     setLastCommand("");
-    setConversationMode(false);
+    conversationModeRef.current = false;
+    setConversationModeTrigger(false);
     lastLLMWasQuestionRef.current = false;
     // Generar nuevo ID de conversación para empezar un nuevo hilo
     setConversationId(`conv_${Date.now()}`);
@@ -741,7 +776,7 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
       };
 
       recognition.onend = () => {
-        console.log("[Voice] Recognition ended");
+        console.log("[Voice] Recognition ended, isProcessing:", isProcessingCommandRef.current);
         isListeningRef.current = false;
 
         // NO auto-restart si estamos procesando un comando (el processCommand lo hará)
@@ -750,9 +785,11 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
           return;
         }
 
-        // Auto-restart si no hay error y no estamos desconectados
-        if (status !== "error" && status !== "disconnected") {
+        // Auto-restart si el recognition existe y no estamos desconectados/error
+        // Usamos recognitionRef para verificar que no fue desconectado manualmente
+        if (recognitionRef.current) {
           setTimeout(() => {
+            // Verificar nuevamente que no estamos procesando (puede haber cambiado)
             if (recognitionRef.current && !isProcessingCommandRef.current) {
               try {
                 recognitionRef.current.start();
@@ -761,6 +798,8 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
               } catch (err) {
                 console.error("[Voice] Error auto-restarting:", err);
               }
+            } else {
+              console.log("[Voice] Skipped auto-restart - processing or disconnected");
             }
           }, 100);
         }
@@ -802,14 +841,15 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
   // TIMEOUT AUTOMÁTICO DE CONVERSACIÓN - Recuperado del servidor Python
   // ============================================================================
   useEffect(() => {
-    if (!conversationMode) return;
+    if (!conversationModeTrigger) return;
 
     console.log("[Timeout] Iniciando verificación de timeout de conversación");
 
     const interval = setInterval(() => {
       if (checkTimeout()) {
         console.log("[Timeout] Conversación expirada - desactivando modo conversación");
-        setConversationMode(false);
+        conversationModeRef.current = false;
+        setConversationModeTrigger(false);
         lastLLMWasQuestionRef.current = false;
         clearPending();
       }
@@ -818,7 +858,7 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
     return () => {
       clearInterval(interval);
     };
-  }, [conversationMode, checkTimeout, clearPending]);
+  }, [conversationModeTrigger, checkTimeout, clearPending]);
 
   // Auto-conectar al montar SOLO en desktop
   // En móvil REQUIERE interacción del usuario
