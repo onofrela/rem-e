@@ -16,6 +16,11 @@ export const routes: NavigationRoute[] = [
     keywords: ["inicio", "home", "principal", "casa", "comienzo"],
   },
   {
+    path: "/mi-cocina",
+    name: "Mi Cocina",
+    keywords: ["mi cocina", "electrodomésticos", "electrodomesticos", "aparatos", "dispositivos", "equipos", "herramientas"],
+  },
+  {
     path: "/cook",
     name: "Cocinar",
     keywords: ["cocinar", "cook", "preparar", "hacer comida", "cocina"],
@@ -24,11 +29,6 @@ export const routes: NavigationRoute[] = [
     path: "/inventory",
     name: "Inventario",
     keywords: ["inventario", "ingredientes", "despensa", "almacén", "almacen", "productos"],
-  },
-  {
-    path: "/mi-cocina",
-    name: "Mi Cocina",
-    keywords: ["mi cocina", "electrodomésticos", "electrodomesticos", "aparatos", "dispositivos", "equipos", "herramientas"],
   },
   {
     path: "/recipes",
@@ -83,6 +83,26 @@ const navigationVerbs = [
  */
 export function parseNavigationCommand(text: string): NavigationRoute | null {
   const lowerText = text.toLowerCase().trim();
+
+  // IMPORTANTE: Si el comando menciona "receta de/para [nombre plato]", NO es navegación general
+  // Ejemplos que NO deben interceptarse:
+  // - "llévame a la receta de arroz blanco" (específica)
+  // - "quiero ver la receta de pollo" (específica)
+  // Ejemplos que SÍ deben interceptarse:
+  // - "llévame a recetas" (general)
+  // - "ve a cocinar" (general)
+  const specificRecipePatterns = [
+    /receta\s+(de|del|para)\s+\w+/i,  // "receta de arroz", "receta para pollo"
+    /receta\s+de\s+la\s+\w+/i,         // "receta de la pizza"
+    /(cocinar|hacer|preparar)\s+\w+\s+\w+/i, // "cocinar arroz blanco"
+    /quiero\s+(cocinar|hacer|preparar)\s+\w+/i, // "quiero cocinar arroz"
+  ];
+
+  const isSpecificRecipe = specificRecipePatterns.some(pattern => pattern.test(lowerText));
+  if (isSpecificRecipe) {
+    console.log("[Navigation] Specific recipe detected, skipping navigation:", text);
+    return null;
+  }
 
   // Verificar si es un comando de navegación
   let targetText = lowerText;

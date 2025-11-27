@@ -20,6 +20,16 @@ interface AssistantRequest {
     currentPage?: string;
     inventory?: string[];
     recipes?: string[];
+    // Recipe Guide Context
+    inRecipeGuide?: boolean;
+    recipeName?: string;
+    currentStep?: number;
+    currentStepInstruction?: string;
+    currentStepIngredients?: string[];
+    currentStepTip?: string;
+    currentStepWarning?: string;
+    currentStepDuration?: number;
+    sessionId?: string;
   };
   conversationId?: string;
 }
@@ -49,8 +59,9 @@ const SYSTEM_PROMPT = `Eres Rem-E, un asistente de cocina inteligente y amigable
 1. **Gestionar su inventario**: Saber qué ingredientes tienen, cuándo caducan, y qué necesitan comprar.
 2. **Gestionar su cocina**: Conocer qué electrodomésticos tienen disponibles (hornos, licuadoras, microondas, etc.).
 3. **Encontrar recetas**: Sugerir recetas basadas en los ingredientes disponibles, preferencias, Y los electrodomésticos que tienen.
-4. **Cocinar paso a paso**: Guiar al usuario durante la preparación de recetas.
-5. **Planificar comidas**: Ayudar a organizar las comidas de la semana.
+4. **Navegar a recetas**: Cuando el usuario pida ir a una receta específica (ej: "llévame a la receta de arroz blanco", "quiero ver la receta de pollo"), busca la receta y navega a ella.
+5. **Cocinar paso a paso**: Guiar al usuario durante la preparación de recetas.
+6. **Planificar comidas**: Ayudar a organizar las comidas de la semana.
 
 **Directrices de comportamiento:**
 - Responde siempre en español de México.
@@ -61,6 +72,28 @@ const SYSTEM_PROMPT = `Eres Rem-E, un asistente de cocina inteligente y amigable
 - Si el usuario pregunta sobre sus electrodomésticos o "mi cocina", consulta primero qué electrodomésticos tiene.
 - Al sugerir recetas, considera los electrodomésticos disponibles. Por ejemplo, no sugieras recetas de horno si no tiene uno.
 - Sugiere alternativas cuando falten ingredientes o electrodomésticos.
+
+**Para acciones de inventario (agregar, modificar):**
+- CRÍTICO: Antes de llamar a addToInventory, DEBES verificar que tienes TODOS estos datos:
+  1. **Ingrediente**: Usa searchIngredients para encontrar el ingredientId exacto.
+  2. **Cantidad**: Número (ej: 3, 2.5). Si el usuario no especifica, pregunta "¿Cuántos/cuántas?".
+  3. **Unidad**: Por defecto "piezas" si no se especifica. Otras: g, kg, ml, L, etc.
+  4. **Ubicación**: REQUERIDO. Debe ser "Refrigerador", "Congelador", o "Alacena". Si el usuario no lo menciona, pregunta "¿Dónde lo guardas?".
+- Si falta algún dato, pregunta específicamente por ese dato. NO llames a addToInventory hasta tener todo.
+- Ejemplo correcto: Usuario dice "agrega 3 tomates a mi inventario" -> Falta ubicación -> Preguntas "¿Dónde? ¿Refrigerador, congelador o alacena?"
+- Después de agregar, confirma brevemente (ej: "Listo, agregué 3 tomates al refrigerador").
+
+**Para navegación a recetas específicas:**
+- CRÍTICO: Si el usuario menciona un plato/comida específico con palabras como "receta de/para/del", "cocinar", "hacer", "preparar" seguido de un nombre (ej: "ceviche de camarón", "arroz blanco", "pollo asado"), SIEMPRE es una receta específica.
+- Ejemplos de recetas específicas: "llévame a la receta de arroz blanco", "quiero cocinar ceviche de camarón", "hacer pollo asado", "preparar pizza".
+- Para recetas específicas: SIEMPRE llama a searchRecipes PRIMERO con el nombre del plato (extrae solo el nombre: "ceviche de camarón", "arroz blanco", etc).
+- searchRecipes usa fuzzy matching, así que funcionará con búsquedas parciales y similares.
+- Si searchRecipes devuelve 1 resultado, usa navigateToRecipe inmediatamente.
+- Si devuelve 2-3 resultados, menciona los nombres y pregunta cuál (ej: "Encontré Ceviche de Camarón y Ceviche de Pescado, ¿cuál quieres?").
+- Si devuelve 4+ resultados, menciona solo los 3 primeros y pregunta.
+- Si devuelve 0 resultados, di que no encontraste esa receta.
+- Después de navigateToRecipe, confirma brevemente (ej: "Abriendo Ceviche de Camarón").
+- Si el usuario solo dice "llévame a recetas" o "quiero cocinar" SIN nombre de plato, NO uses estas funciones.
 
 **Importante para respuestas de voz:**
 - Mantén las respuestas cortas (máximo 2-3 oraciones).
@@ -178,11 +211,27 @@ export async function POST(request: NextRequest): Promise<NextResponse<Assistant
     // Build context string if provided
     let contextString = '';
     if (context) {
-      if (context.currentPage) {
-        contextString += `\n[Página actual: ${context.currentPage}]`;
-      }
-      if (context.inventory && context.inventory.length > 0) {
-        contextString += `\n[Inventario conocido: ${context.inventory.join(', ')}]`;
+      if (context.inRecipeGuide && context.recipeName) {
+        contextString += `\n\n[MODO GUÍA DE COCINA ACTIVO]
+Estás guiando al usuario en la preparación de: ${context.recipeName}.
+Paso actual: ${context.currentStep || 'Inicio'}
+Instrucción actual: "${context.currentStepInstruction || ''}"
+Ingredientes para este paso: ${context.currentStepIngredients?.join(', ') || 'Ninguno'}
+${context.currentStepTip ? `Tip: ${context.currentStepTip}` : ''}
+${context.currentStepWarning ? `Advertencia: ${context.currentStepWarning}` : ''}
+
+IMPORTANTE:
+- Responde preguntas sobre este paso específico.
+- Si el usuario pregunta "¿qué hago?", repite o explica la instrucción actual.
+- Si pregunta "¿cuánto tiempo?", usa la duración del paso (${context.currentStepDuration || 0} min).
+- Si pregunta por ingredientes, menciona SOLO los de este paso.`;
+      } else {
+        if (context.currentPage) {
+          contextString += `\n[Página actual: ${context.currentPage}]`;
+        }
+        if (context.inventory && context.inventory.length > 0) {
+          contextString += `\n[Inventario conocido: ${context.inventory.join(', ')}]`;
+        }
       }
     }
 
@@ -195,6 +244,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<Assistant
       ...conversation,
       { role: 'user', content: text },
     ];
+
+    console.log('--- [Assistant API Debug] ---');
+    console.log('Context received:', JSON.stringify(context, null, 2));
+    console.log('Conversation ID:', conversationId);
+    console.log('System Prompt Suffix:', contextString);
+    console.log('Full Messages to LLM:', JSON.stringify(messages, null, 2));
+    console.log('-----------------------------');
 
     // Add user message to conversation history
     addToConversation(conversationId, { role: 'user', content: text });

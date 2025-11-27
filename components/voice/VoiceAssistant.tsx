@@ -54,6 +54,7 @@ export function VoiceAssistant() {
         sessionId,
       };
       console.log('[VoiceAssistant] Sending recipe context:', context);
+      console.log('[VoiceAssistant Debug] Full Context Object:', JSON.stringify(context, null, 2));
       updateContext(context);
     } else {
       console.log('[VoiceAssistant] Not in guide, sending inRecipeGuide: false');

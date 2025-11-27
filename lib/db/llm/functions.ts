@@ -235,13 +235,13 @@ export const llmFunctions: FunctionDefinition[] = [
   // ==========================================================================
   {
     name: 'searchRecipes',
-    description: 'Busca recetas por nombre, descripción, tags o cocina.',
+    description: 'Busca recetas por nombre, descripción, tags o cocina usando fuzzy matching. USA ESTA FUNCIÓN cuando el usuario mencione un plato/comida específico (ej: "ceviche de camarón", "arroz blanco", "pizza", "tacos"). NO uses esta función para navegación general como "llévame a recetas". Esta función es MUY IMPORTANTE para encontrar recetas antes de navigateToRecipe.',
     parameters: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Término de búsqueda',
+          description: 'Nombre del plato a buscar (ej: "ceviche de camarón", "arroz blanco", "pizza margarita"). Usa fuzzy matching, así que funciona con búsquedas parciales.',
         },
       },
       required: ['query'],
@@ -725,6 +725,28 @@ export const llmFunctions: FunctionDefinition[] = [
         },
       },
       required: [],
+    },
+  },
+
+  // ==========================================================================
+  // NAVIGATION FUNCTIONS
+  // ==========================================================================
+  {
+    name: 'navigateToRecipe',
+    description: 'Navega a la página de detalles de UNA RECETA ESPECÍFICA POR NOMBRE (ej: "llévame a LA RECETA DE arroz blanco", "quiero ver LA RECETA DE pollo asado", "abre LA RECETA DE pizza margarita"). IMPORTANTE: Solo usa esta función cuando el usuario mencione el NOMBRE de un plato específico. NO uses esta función para "llévame a recetas" o "quiero cocinar" sin nombre de plato. Antes de llamar esta función, SIEMPRE busca primero la receta con searchRecipes para obtener el recipeId exacto. Si hay múltiples coincidencias, pregunta al usuario cuál quiere.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recipeId: {
+          type: 'string',
+          description: 'ID exacto de la receta a la que navegar (obtenido con searchRecipes)',
+        },
+        recipeName: {
+          type: 'string',
+          description: 'Nombre de la receta (para confirmación al usuario)',
+        },
+      },
+      required: ['recipeId', 'recipeName'],
     },
   },
 ];

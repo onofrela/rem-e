@@ -91,6 +91,8 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
   const [error, setError] = useState<VoiceError | null>(null);
   const [executingFunction] = useState<string | null>(null);
   const [currentContext, setCurrentContext] = useState<VoiceContext>({});
+  const [conversationMode, setConversationMode] = useState(false);
+  const lastLLMWasQuestionRef = useRef(false);
 
   const recognitionRef = useRef<any | null>(null);
   const isListeningRef = useRef(false);
@@ -126,6 +128,16 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
     }
     return text;
   }, []);
+  async function handleLLMClassification(text: string) {
+    const res = await fetch('/api/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+
+    const data = await res.json();
+    return data.classification; // NAVIGATION, INVENTORY_ACTION, RECIPE_SEARCH, COOKING_CONTROL, GENERAL_QUESTION
+  }
 
   // Clasificar intent: navegación vs pregunta
   const classifyIntent = useCallback((text: string): { type: 'navigation' | 'question'; route?: string } => {
@@ -264,6 +276,14 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
           response: data.response,
           timestamp: Date.now(),
         });
+        if (data.response.trim().endsWith('?')) {
+          setConversationMode(true);
+          lastLLMWasQuestionRef.current = true;
+        } else {
+          setConversationMode(false);
+          lastLLMWasQuestionRef.current = false;
+        }
+
         console.log("[Voice] Respuesta LLM:", data.response);
         console.log("[Voice] Funciones ejecutadas:", data.functionsCalled?.map((f: any) => f.name).join(', ') || 'ninguna');
       } else {
@@ -303,6 +323,26 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
           }
         }
 
+        if (conversationMode) {
+          console.log("[Voice] Conversation mode active, processing without wake word");
+
+          const intent = classifyIntent(transcriptText);
+
+          // Si el usuario ya no responde a la pregunta → terminar conversación
+          if (!transcriptText.trim().endsWith('?')) {
+            setConversationMode(false);
+            lastLLMWasQuestionRef.current = false;
+          }
+
+          if (intent.type === 'navigation') {
+            processNavigation(transcriptText);
+          } else {
+            processQuestion(transcriptText);
+          }
+
+          setTranscript("");
+          return;
+        }
         // Si aún no detectamos palabra de activación, buscarla
         if (!wakeWordDetectedRef.current) {
           if (detectWakeWord(transcriptText)) {
@@ -333,6 +373,9 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
         } else {
           // Ya detectamos wake word, este es el comando
           console.log("[Voice] Processing command after wake word:", transcriptText);
+          // Si estábamos en conversación pero el usuario usó wake word, se resetea
+          setConversationMode(false);
+          lastLLMWasQuestionRef.current = false;
 
           // Clasificar intent
           const intent = classifyIntent(transcriptText);
@@ -355,6 +398,9 @@ export function useVoiceNavigation(): UseVoiceNavigationReturn {
   const clearResponse = useCallback(() => {
     setLlmResponse(null);
     setLastCommand("");
+    setConversationMode(false);
+    lastLLMWasQuestionRef.current = false;
+
   }, []);
 
   // Limpiar error

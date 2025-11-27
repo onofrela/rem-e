@@ -85,6 +85,18 @@ function handleSpecialFunctionEvents(functionName: string, result: FunctionResul
       );
     }
   }
+
+  // Manejar función de navegación a receta
+  if (functionName === 'navigateToRecipe' && result.data) {
+    const data = result.data as { action?: string; url?: string; recipeId?: string; recipeName?: string };
+    if (data.action === 'navigate' && data.url) {
+      console.log('[ClientFunctionExecutor] Navigating to:', data.url);
+      // Navegar usando Next.js router
+      if (typeof window !== 'undefined') {
+        window.location.href = data.url;
+      }
+    }
+  }
 }
 
 /**
@@ -128,5 +140,7 @@ export function getAvailableFunctionNames(): string[] {
     'substituteIngredientInCooking',
     'createTimerFromStep',
     'getCurrentStepDetails',
+    // Navigation functions
+    'navigateToRecipe',
   ];
 }

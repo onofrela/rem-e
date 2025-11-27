@@ -446,17 +446,36 @@ async function handleSearchRecipes(args: Record<string, unknown>): Promise<Funct
     const query = args.query as string;
     const recipes = await recipeService.searchRecipes(query);
 
+    if (recipes.length === 0) {
+      return {
+        success: true,
+        data: {
+          found: false,
+          count: 0,
+          recipes: [],
+          message: `No se encontraron recetas para "${query}". Intenta con otro nombre.`
+        }
+      };
+    }
+
     return {
       success: true,
-      data: recipes.map(r => ({
-        id: r.id,
-        name: r.name,
-        description: r.description,
-        time: r.time,
-        difficulty: r.difficulty,
-        servings: r.servings,
-        category: r.category,
-      })),
+      data: {
+        found: true,
+        count: recipes.length,
+        recipes: recipes.map(r => ({
+          id: r.id,
+          name: r.name,
+          description: r.description,
+          time: r.time,
+          difficulty: r.difficulty,
+          servings: r.servings,
+          category: r.category,
+        })),
+        message: recipes.length === 1
+          ? `Encontré: ${recipes[0].name}`
+          : `Encontré ${recipes.length} recetas: ${recipes.slice(0, 3).map(r => r.name).join(', ')}${recipes.length > 3 ? '...' : ''}`
+      }
     };
   } catch (error) {
     return {
@@ -2032,6 +2051,44 @@ async function handleGetRecipesByNutrition(args: Record<string, unknown>): Promi
   }
 }
 
+// =============================================================================
+// NAVIGATION HANDLERS
+// =============================================================================
+
+async function handleNavigateToRecipe(args: Record<string, unknown>): Promise<FunctionResult> {
+  try {
+    const recipeId = args.recipeId as string;
+    const recipeName = args.recipeName as string;
+
+    // Verify recipe exists
+    const recipe = await recipeService.getRecipeById(recipeId);
+    if (!recipe) {
+      return {
+        success: false,
+        error: `La receta "${recipeName}" no se encontró`,
+      };
+    }
+
+    console.log(`[Navigation] Navigating to recipe: ${recipe.name} (${recipeId})`);
+
+    return {
+      success: true,
+      data: {
+        action: 'navigate',
+        url: `/recipes/${recipeId}`,
+        recipeName: recipe.name,
+        recipeId: recipe.id,
+        message: `Abriendo la receta de ${recipe.name}`,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error navegando a la receta',
+    };
+  }
+}
+
 const handlers: Record<string, FunctionHandler> = {
   // Ingredient handlers
   searchIngredients: handleSearchIngredients,
@@ -2109,6 +2166,9 @@ const handlers: Record<string, FunctionHandler> = {
   getRecipeNameById: handleGetRecipeNameById,
   getUserCookingHistory: handleGetUserCookingHistory,
   getRecipesByNutrition: handleGetRecipesByNutrition,
+
+  // Navigation handlers
+  navigateToRecipe: handleNavigateToRecipe,
 };
 
 /**

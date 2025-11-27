@@ -111,16 +111,85 @@ export async function getRecipeById(id: string): Promise<Recipe | null> {
 /**
  * Search recipes by text (name, description, tags)
  */
+/**
+ * Calculate similarity score between two strings (0-1)
+ * Uses word overlap and partial matching
+ */
+function calculateSimilarity(str1: string, str2: string): number {
+  const words1 = str1.toLowerCase().split(/\s+/);
+  const words2 = str2.toLowerCase().split(/\s+/);
+
+  let matchScore = 0;
+
+  // Exact word matches
+  for (const word1 of words1) {
+    for (const word2 of words2) {
+      if (word1 === word2) {
+        matchScore += 2; // Full word match
+      } else if (word1.includes(word2) || word2.includes(word1)) {
+        matchScore += 1; // Partial match
+      }
+    }
+  }
+
+  // Normalize by total words
+  const maxPossibleScore = words1.length * words2.length * 2;
+  return maxPossibleScore > 0 ? matchScore / maxPossibleScore : 0;
+}
+
 export async function searchRecipes(query: string): Promise<Recipe[]> {
   const all = await getAllRecipes();
-  const lowerQuery = query.toLowerCase();
+  const lowerQuery = query.toLowerCase().trim();
 
-  return all.filter(recipe =>
-    recipe.name.toLowerCase().includes(lowerQuery) ||
-    recipe.description.toLowerCase().includes(lowerQuery) ||
-    recipe.tags.some(tag => tag.toLowerCase().includes(lowerQuery)) ||
-    recipe.cuisine?.toLowerCase().includes(lowerQuery)
-  );
+  // Remove common filler words
+  const queryWords = lowerQuery
+    .replace(/\b(de|la|el|del|para|con|y|a)\b/g, '')
+    .trim();
+
+  // Score each recipe
+  const scored = all.map(recipe => {
+    const lowerName = recipe.name.toLowerCase();
+    const lowerDesc = recipe.description.toLowerCase();
+    const lowerTags = recipe.tags.map(t => t.toLowerCase()).join(' ');
+
+    let score = 0;
+
+    // Exact name match (highest priority)
+    if (lowerName === lowerQuery || lowerName === queryWords) {
+      score += 100;
+    }
+
+    // Name contains query
+    if (lowerName.includes(lowerQuery) || lowerName.includes(queryWords)) {
+      score += 50;
+    }
+
+    // Similarity score on name
+    score += calculateSimilarity(lowerName, queryWords) * 30;
+
+    // Description contains query
+    if (lowerDesc.includes(lowerQuery) || lowerDesc.includes(queryWords)) {
+      score += 20;
+    }
+
+    // Tags match
+    if (lowerTags.includes(lowerQuery) || lowerTags.includes(queryWords)) {
+      score += 15;
+    }
+
+    // Cuisine match
+    if (recipe.cuisine?.toLowerCase().includes(lowerQuery)) {
+      score += 10;
+    }
+
+    return { recipe, score };
+  });
+
+  // Filter out very low scores and sort by score
+  return scored
+    .filter(item => item.score > 5)
+    .sort((a, b) => b.score - a.score)
+    .map(item => item.recipe);
 }
 
 /**
